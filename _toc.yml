@@ -16,12 +16,23 @@ parts:
   - caption: World Models
     chapters:
       - file: world-models/index
-        sections:
-          - file: world-models/dreamer
-          - file: world-models/planet
-          - file: world-models/muzero
-          - file: world-models/vjepa
-          - file: world-models/generative-wm
+  - caption: Latent World Models
+    chapters:
+      - file: world-models/planet
+      - file: world-models/dreamer
+      - file: world-models/muzero
+      - file: world-models/dreamerv2
+      - file: world-models/dreamerv3
+  - caption: Predictive World Models
+    chapters:
+      - file: world-models/vjepa
+      - file: world-models/vjepa2
+  - caption: Generative World Models
+    chapters:
+      - file: world-models/gamengen
+      - file: world-models/genie
+      - file: world-models/diamond
+      - file: world-models/cosmos
   - caption: Paper Reviews
     chapters:
       - file: reviews/index
