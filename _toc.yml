@@ -24,21 +24,25 @@ parts:
           - file: reviews/openvla
       - file: world-models/latent
         sections:
+          - file: world-models/world-models-2018
           - file: world-models/planet
           - file: world-models/dreamer
           - file: world-models/muzero
           - file: world-models/dreamerv2
+          - file: world-models/tdmpc
           - file: world-models/dreamerv3
       - file: world-models/sequence
         sections:
           - file: world-models/decision-transformer
           - file: world-models/trajectory-transformer
+          - file: world-models/iris
       - file: world-models/predictive
         sections:
           - file: world-models/vjepa
           - file: world-models/vjepa2
       - file: world-models/generative
         sections:
+          - file: world-models/gaia1
           - file: world-models/gamengen
           - file: world-models/genie
           - file: world-models/diamond

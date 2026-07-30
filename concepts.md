@@ -47,7 +47,7 @@ OpenVLA와 Dreamer를 "누가 더 세냐"로 붙이기 어렵다. **다른 문�
 
 요지: **로봇 제어에 실제로 닿아 있는 건 예측·표현형**(특히 JEPA류)이고, 생성·영상형은 인상적이지만 제어 신뢰성은 아직이다.
 
-→ 각 모델의 수식·수치·알고리즘 심화는 [World Models](world-models/latent.md) 트랙에서 논문 원문 대조로 정리했다 — [Latent](world-models/latent.md)(PlaNet·Dreamer V1/V2/V3·MuZero) · [Sequence](world-models/sequence.md)(DT·TT) · [Predictive](world-models/predictive.md)(V-JEPA 1/2) · [Generative](world-models/generative.md)(GameNGen·Genie·DIAMOND·Cosmos).
+→ 각 모델의 수식·수치·알고리즘 심화는 [World Models](world-models/latent.md) 트랙에서 논문 원문 대조로 정리했다 — [Latent](world-models/latent.md)(World Models 2018·PlaNet·Dreamer V1/V2/V3·MuZero·TD-MPC) · [Sequence](world-models/sequence.md)(DT·TT·IRIS) · [Predictive](world-models/predictive.md)(V-JEPA 1/2) · [Generative](world-models/generative.md)(GAIA-1·GameNGen·Genie·DIAMOND·Cosmos).
 
 ## 4. 공부 방향 메모 (개인)
 
