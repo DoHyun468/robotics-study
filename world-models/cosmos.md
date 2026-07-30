@@ -1,9 +1,11 @@
-# Cosmos (2025) — Physical AI를 위한 World Foundation Model 플랫폼 (NVIDIA)
+# Cosmos (2025)
+
+*Physical AI를 위한 World Foundation Model 플랫폼 (NVIDIA)*
 
 작성: world-models 심화 트랙 · 원문 기준
 - NVIDIA, *Cosmos World Foundation Model Platform for Physical AI*, 2025 (arXiv 2501.03575).
 
-같은 갈래: [DIAMOND](diamond.md) · [GameNGen](gamengen.md) · [Genie](genie.md) · [생성·영상형 개요로 돌아가기](index.md)
+같은 갈래: [DIAMOND](diamond.md) · [GameNGen](gamengen.md) · [Genie](genie.md) · [생성·영상형 개요로 돌아가기](generative.md)
 
 **생성·영상형 world model**은 관측(픽셀/토큰)을 확산·자기회귀 등으로 **직접 생성**해 "플레이 가능한 세계"를 만드는 계열이다. Cosmos는 이 갈래를 게임이 아니라 **로봇·자율주행 같은 Physical AI의 데이터·시뮬레이터 공급자**로 정면 겨냥한 플랫폼이다.
 

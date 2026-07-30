@@ -1,9 +1,11 @@
-# DIAMOND (2024) — 확산 world model 안에서 배우는 Atari 에이전트
+# DIAMOND (2024)
+
+*확산 world model 안에서 배우는 Atari 에이전트*
 
 작성: world-models 심화 트랙 · 원문 기준
 - Alonso 외, *Diffusion for World Modeling: Visual Details Matter in Atari*, NeurIPS 2024 (arXiv 2405.12399).
 
-같은 갈래: [GameNGen](gamengen.md) · [Genie](genie.md) · [Cosmos](cosmos.md) · [생성·영상형 개요로 돌아가기](index.md)
+같은 갈래: [GameNGen](gamengen.md) · [Genie](genie.md) · [Cosmos](cosmos.md) · [생성·영상형 개요로 돌아가기](generative.md)
 
 **생성·영상형 world model**은 관측(픽셀/토큰)을 확산·자기회귀 등으로 **직접 생성**해 "플레이 가능한 세계"를 만드는 계열이다. [Dreamer](dreamer.md)류가 관측을 압축한 **컴팩트 잠재**에서 상상 롤아웃을 굴리는 것과 달리, DIAMOND는 이산 잠재 압축 자체가 정책 성능을 갉아먹을 수 있다는 문제의식에서 출발한다.
 

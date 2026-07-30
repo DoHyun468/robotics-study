@@ -1,9 +1,11 @@
-# GameNGen (2024) — 확산 모델로 만든 실시간 DOOM 게임엔진
+# GameNGen (2024)
+
+*확산 모델로 만든 실시간 DOOM 게임엔진*
 
 작성: world-models 심화 트랙 · 원문 기준
 - Valevski, Leviathan, Arar, Fruchter (Google), *Diffusion Models Are Real-Time Game Engines*, 2024 (arXiv 2408.14837).
 
-같은 갈래: [DIAMOND](diamond.md) · [Genie](genie.md) · [Cosmos](cosmos.md) · [생성·영상형 개요로 돌아가기](index.md)
+같은 갈래: [DIAMOND](diamond.md) · [Genie](genie.md) · [Cosmos](cosmos.md) · [생성·영상형 개요로 돌아가기](generative.md)
 
 **생성·영상형 world model**은 관측(픽셀/토큰)을 확산·자기회귀 등으로 **직접 생성**해 "플레이 가능한 세계"를 만드는 계열이다. Dreamer/MuZero처럼 제어를 위한 컴팩트 잠재를 배우는 게 목적이 아니라, **관측 자체의 생성 충실도**가 목표다. GameNGen은 이 갈래에서 "신경망이 게임 엔진 그 자체를 대체할 수 있는가"라는 질문에 가장 직접적으로 답한 사례다.
 

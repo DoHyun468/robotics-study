@@ -46,7 +46,7 @@ RL vs world-model 정리. 왜 이 스터디가 perception→action에 집중하�
 :::
 
 :::{grid-item-card} World Models
-:link: world-models/index
+:link: world-models/latent
 :link-type: doc
 Dreamer · PlaNet · MuZero · V-JEPA-2 · 생성형 WM — arXiv 원문 대조 심화 리뷰.
 :::

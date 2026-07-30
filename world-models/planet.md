@@ -1,4 +1,6 @@
-# PlaNet — 잠재 동역학 + 온라인 계획(정책망 없이)
+# PlaNet (2019)
+
+*잠재 동역학 + 온라인 계획(정책망 없이)*
 
 작성: world-models 심화 트랙 · 원문 기준
 - Hafner, Lillicrap, Fischer, Villegas, Ha, Lee, Davidson, *Learning Latent Dynamics for Planning from Pixels* (PlaNet), ICML 2019 (arXiv 1811.04551).

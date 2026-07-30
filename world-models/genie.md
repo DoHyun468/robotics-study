@@ -1,9 +1,11 @@
-# Genie (2024) — 라벨 없는 영상에서 잠재 행동을 배우는 상호작용 환경
+# Genie (2024)
+
+*라벨 없는 영상에서 잠재 행동을 배우는 상호작용 환경*
 
 작성: world-models 심화 트랙 · 원문 기준
 - Bruce 외 (Google DeepMind), *Genie: Generative Interactive Environments*, ICML 2024 (arXiv 2402.15391); 후속 Genie-2/3.
 
-같은 갈래: [DIAMOND](diamond.md) · [GameNGen](gamengen.md) · [Cosmos](cosmos.md) · [생성·영상형 개요로 돌아가기](index.md)
+같은 갈래: [DIAMOND](diamond.md) · [GameNGen](gamengen.md) · [Cosmos](cosmos.md) · [생성·영상형 개요로 돌아가기](generative.md)
 
 **생성·영상형 world model**은 관측(픽셀/토큰)을 확산·자기회귀 등으로 **직접 생성**해 "플레이 가능한 세계"를 만드는 계열이다. Genie는 여기에 한 가지를 더한다 — **행동 라벨이 전혀 없는** 인터넷 영상만으로도 "행동으로 제어되는 세계"를 배울 수 있다는 것.
 

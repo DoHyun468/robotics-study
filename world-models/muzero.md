@@ -1,4 +1,6 @@
-# MuZero — 관측 재구성 없이, 보상·가치·정책만 예측하는 world model + MCTS
+# MuZero (2020)
+
+*관측 재구성 없이 보상·가치·정책만 예측 + MCTS*
 
 작성: world-models 심화 트랙 · 원문 기준
 - Schrittwieser, Antonoglou, Hubert, Simonyan, Sifre, Schmitt, Guez, Lockhart, Hassabis, Graepel, Lillicrap, Silver, *Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model* (MuZero), Nature 2020 (arXiv 1911.08265).
