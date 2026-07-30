@@ -47,6 +47,8 @@ OpenVLA와 Dreamer를 "누가 더 세냐"로 붙이기 어렵다. **다른 문�
 
 요지: **로봇 제어에 실제로 닿아 있는 건 예측·표현형**(특히 JEPA류)이고, 생성·영상형은 인상적이지만 제어 신뢰성은 아직이다.
 
+→ 각 모델의 수식·수치·알고리즘 심화는 [World Models](world-models/index.md) 트랙에서 논문 원문 대조로 정리했다(Dreamer · PlaNet · MuZero · V-JEPA-2 · 생성형 WM).
+
 ## 4. 공부 방향 메모 (개인)
 
 "RL을 따로 파야 하나, world model만 파야 하나, 뭐가 제일 빠른가"에 대한 개인 결론:

@@ -13,6 +13,15 @@ parts:
   - caption: Concepts
     chapters:
       - file: concepts
+  - caption: World Models
+    chapters:
+      - file: world-models/index
+        sections:
+          - file: world-models/dreamer
+          - file: world-models/planet
+          - file: world-models/muzero
+          - file: world-models/vjepa
+          - file: world-models/generative-wm
   - caption: Paper Reviews
     chapters:
       - file: reviews/index

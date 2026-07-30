@@ -45,6 +45,12 @@ OpenVLA LIBERO 4-suite 재현(논문 정합) + 자체 LoRA 파인튜닝의 정�
 RL vs world-model 정리. 왜 이 스터디가 perception→action에 집중하는가.
 :::
 
+:::{grid-item-card} World Models
+:link: world-models/index
+:link-type: doc
+Dreamer · PlaNet · MuZero · V-JEPA-2 · 생성형 WM — arXiv 원문 대조 심화 리뷰.
+:::
+
 ::::
 
 <p class="rs-foot">
