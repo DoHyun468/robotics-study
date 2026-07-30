@@ -56,9 +56,18 @@ $$
 
 ## 3. 결과
 
-수치는 원문(arXiv 2010.02193) 대조 완료.
+수치는 원문(arXiv 2010.02193) 대조 완료. world model을 픽셀 재구성으로 학습하고 **행동은 전부 잠재 상상에서** 배운 최초의 에이전트다.
 
-world model을 픽셀 재구성으로 학습하고 **행동은 전부 잠재 상상에서** 배운 최초의 에이전트로, **Atari 55게임·200M 프레임**에서 **단일 GPU**로 top 단일-GPU 에이전트 **IQN·Rainbow를 동일 연산예산·wall-clock에서 능가**. 원문 보고 점수(200M 스텝): **gamer-normalized 중앙값 2.15, 평균 11.33**(권장 지표인 clipped record mean은 0.28). 이산 행동 actor는 **순수 REINFORCE**(ρ=1, 엔트로피 계수 η=10⁻³), KL balancing α=0.8.
+| 항목 | 값 (원문) |
+|------|-----------|
+| 벤치 | Atari **55게임 · 200M 프레임 · 단일 GPU** |
+| gamer-normalized 중앙값 | **2.15** (인간=1.0) |
+| gamer-normalized 평균 | 11.33 |
+| clipped record mean (원문 권장 지표) | 0.28 |
+| 비교 | 동일 연산예산·wall-clock에서 top 단일-GPU 에이전트 **IQN·Rainbow 능가** |
+| actor 설정 | 순수 REINFORCE(ρ=1), 엔트로피 η=10⁻³, KL balancing α=0.8 |
+
+"상상 속에서만 배웠는데 model-free 최강을 이긴다"가 헤드라인 — V1이 연속제어에서 연 길이 이산·다봉 도메인에서도 성립함을 보인 수치다.
 
 ---
 
