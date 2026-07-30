@@ -19,5 +19,5 @@
 **로봇 관점 요약**: 제어기로 바로 쓸 수 있는 건 아직 없다. DIAMOND는 "생성 화질이 정책 성능이 된다"는 근거를, GameNGen·Genie는 상호작용 세계 생성의 상한을, Cosmos는 실용 경로(데이터 공급)를 각각 담당한다. 정밀 제어가 필요하면 [Predictive](predictive.md)(V-JEPA 2-AC)가, 보상 기반 학습이 필요하면 [Latent](latent.md)(Dreamer류)가 현재로선 더 가깝다.
 
 ```{note}
-**Sequence-Based World Models**(Decision Transformer · Trajectory Transformer)는 아직 이 트랙에서 다루지 않았다 — 추후 추가 예정.
+**Sequence-Based World Models**(Decision Transformer · Trajectory Transformer)는 [별도 카테고리](sequence.md)에서 다룬다.
 ```

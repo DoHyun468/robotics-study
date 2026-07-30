@@ -29,6 +29,10 @@ parts:
           - file: world-models/muzero
           - file: world-models/dreamerv2
           - file: world-models/dreamerv3
+      - file: world-models/sequence
+        sections:
+          - file: world-models/decision-transformer
+          - file: world-models/trajectory-transformer
       - file: world-models/predictive
         sections:
           - file: world-models/vjepa

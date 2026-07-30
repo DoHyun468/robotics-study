@@ -2,8 +2,7 @@
 
 *잠재 동역학 + 온라인 계획(정책망 없이)*
 
-작성: world-models 심화 트랙 · 원문 기준
-- Hafner, Lillicrap, Fischer, Villegas, Ha, Lee, Davidson, *Learning Latent Dynamics for Planning from Pixels* (PlaNet), ICML 2019 (arXiv 1811.04551).
+Hafner, Lillicrap, Fischer, Villegas, Ha, Lee, Davidson, *Learning Latent Dynamics for Planning from Pixels* (PlaNet), ICML 2019 (arXiv 1811.04551).
 
 ## 한 줄 요약
 
@@ -72,7 +71,15 @@ PlaNet의 결정적 차이. **정책을 학습하지 않고**, 매 결정 시점
 
 ## 3. 결과
 
-이미지 입력 연속제어 **DeepMind Control Suite 6개 태스크**(cartpole swingup, reacher easy, cheetah run, finger spin, cup catch, walker walk). 핵심 데이터효율 결과(원문): **PlaNet은 100 에피소드 안에, proprioceptive 상태로 100,000 에피소드 학습한 A3C를 전 태스크에서 능가**. D4PG 대비로는 태스크에 따라 대략 **100~500배 적은 에피소드**로 유사 성능. 단일 에이전트·단일 하이퍼로 6태스크 모두 처리.
+이미지 입력 연속제어 **DeepMind Control Suite 6개 태스크**(cartpole swingup, reacher easy, cheetah run, finger spin, cup catch, walker walk).
+
+| 비교 대상 | 결과 (원문) |
+|-----------|-------------|
+| A3C (proprioceptive 상태 입력) | PlaNet이 **100 에피소드 안에**, 10만 에피소드 학습한 A3C를 **전 태스크에서 능가** |
+| D4PG (이미지 입력) | 태스크에 따라 **약 100~500배 적은 에피소드**로 유사 성능 |
+| 하이퍼파라미터 | 단일 에이전트·단일 설정으로 6태스크 모두 처리 |
+
+"이미지만 보고, 상태를 직접 받은 model-free보다 1,000배 적은 데이터로 이긴다"가 이 논문의 헤드라인이다 — 잠재공간 계획이라는 방향의 유효성을 처음 크게 보인 수치.
 
 ## 4. 스터디와의 개념적 연결
 

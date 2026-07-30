@@ -27,4 +27,4 @@ MuZero (2020)  ← 별개 갈래: 재구성 없이 보상·가치·정책만 예
 | [DreamerV2](dreamerv2.md) | 2021 | 범주형 잠재 32×32, KL balancing(α=0.8) | 학습된 정책 (REINFORCE) | Atari 55게임 median 2.15 — 단일 GPU로 IQN·Rainbow 능가 |
 | [DreamerV3](dreamerv3.md) | 2023 | symlog·twohot·free bits — 튜닝 없는 견고성 | 학습된 정책 (연속 pathwise/이산 REINFORCE) | 고정 하이퍼로 150+ 태스크, Minecraft 다이아 from scratch 최초 |
 
-**읽는 순서 제안**: PlaNet(RSSM이 왜 생겼나) → Dreamer(상상 학습의 원형) → V2·V3(견고성 기법 누적) → MuZero(재구성을 버린 반대편 답). 재구성의 한계가 궁금해지면 [Predictive](predictive.md)(표현만 예측)와 [Generative](generative.md)의 [DIAMOND](diamond.md)(반대로 재구성을 더 잘하기)로 이어진다.
+**읽는 순서 제안**: PlaNet(RSSM이 왜 생겼나) → Dreamer(상상 학습의 원형) → V2·V3(견고성 기법 누적) → MuZero(재구성을 버린 반대편 답). 재구성의 한계가 궁금해지면 [Predictive](predictive.md)(표현만 예측)와 [Generative](generative.md)의 [DIAMOND](diamond.md)(반대로 재구성을 더 잘하기)로, "모델·정책·가치를 아예 하나의 시퀀스 모델로" 쪽이 궁금해지면 [Sequence-Based](sequence.md)(DT·TT)로 이어진다.

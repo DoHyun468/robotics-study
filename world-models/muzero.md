@@ -2,8 +2,7 @@
 
 *관측 재구성 없이 보상·가치·정책만 예측 + MCTS*
 
-작성: world-models 심화 트랙 · 원문 기준
-- Schrittwieser, Antonoglou, Hubert, Simonyan, Sifre, Schmitt, Guez, Lockhart, Hassabis, Graepel, Lillicrap, Silver, *Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model* (MuZero), Nature 2020 (arXiv 1911.08265).
+Schrittwieser, Antonoglou, Hubert, Simonyan, Sifre, Schmitt, Guez, Lockhart, Hassabis, Graepel, Lillicrap, Silver, *Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model* (MuZero), Nature 2020 (arXiv 1911.08265).
 
 ## 한 줄 요약
 
@@ -71,10 +70,13 @@ Training(러너):
 
 ## 3. 결과
 
-- **바둑·체스·쇼기**: 규칙을 **주지 않고도** AlphaZero의 초인 성능에 필적(규칙을 아는 AlphaZero와 동급).
-- **Atari 57게임**: 원문 보고 **human-normalized 중앙값 2041.1% / 평균 4999.2%**, 직전 SOTA인 R2D2(중앙값 1920.6% / 평균 4024.9%)를 능가하고 **57게임 중 42게임에서 우위**. 재구성 없는 학습 모델만으로 달성.
-- **MuZero Reanalyze**(데이터 재사용, 샘플효율 변형)는 200M 프레임에서 **중앙값 731.1%**로 기존 방법 대폭 상회.
-- 이후 **Sampled MuZero**(연속·큰 행동공간), **EfficientZero**(샘플효율 대폭 개선) 등으로 확장.
+| 도메인 | 결과 (원문) |
+|--------|-------------|
+| 바둑·체스·쇼기 | 규칙을 **주지 않고도** AlphaZero(규칙을 아는)의 초인 성능에 필적 |
+| Atari 57게임 | human-normalized **중앙값 2041.1% / 평균 4999.2%** — 직전 SOTA R2D2(1920.6%/4024.9%)를 능가, **42/57게임 우위** |
+| MuZero Reanalyze | 200M 프레임에서 중앙값 731.1% — 데이터 재사용 변형으로 샘플효율 대폭 개선 |
+
+재구성 없는 학습 모델만으로 위 전부를 달성했다는 게 요점. 이후 **Sampled MuZero**(연속·큰 행동공간), **EfficientZero**(샘플효율)로 확장된다.
 
 ## 4. 스터디와의 개념적 연결
 

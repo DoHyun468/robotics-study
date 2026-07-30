@@ -42,12 +42,12 @@ OpenVLA와 Dreamer를 "누가 더 세냐"로 붙이기 어렵다. **다른 문�
 "world model"이 한 덩어리가 아니다. 목적에 따라 세 갈래이고 성숙도가 다르다.
 
 - **예측·표현형** (Dreamer, JEPA/V-JEPA, MuZero): 제어·계획·샘플효율에서 가장 **성숙**. latent 공간에서 미래를 예측/평가. **V-JEPA-2가 실제 로봇 계획에 쓰이기 시작** — 로봇 실용의 최전선. 3D/기하 강점과 붙이기 좋은 갈래.
-- **시퀀스·토큰형** (IRIS, Genie 계열): 관측을 토큰으로 만들어 Transformer로 다음-토큰 예측. 샘플효율↑, **인터랙티브 환경 생성**이 부상.
+- **시퀀스·토큰형** (Decision/Trajectory Transformer, IRIS, Genie 계열): 궤적·관측을 토큰으로 만들어 Transformer로 다음-토큰 예측. 샘플효율↑, **인터랙티브 환경 생성**이 부상. RL을 시퀀스 모델링으로 재정의한 원류(DT·TT)는 [Sequence-Based 리뷰](world-models/sequence.md) 참고.
 - **생성·영상형** (DIAMOND, GameNGen, Oasis, Cosmos, Genie-3): 화제성·스케일 최고, 보기엔 화려. 그러나 **장기 물리 일관성·정확한 장기 예측·정밀 제어가 미해결** → 당장 로봇 제어기로 쓰기보다 **데이터/시뮬레이션 생성**(sim 자산, 도메인 랜덤화)에 먼저 유용.
 
 요지: **로봇 제어에 실제로 닿아 있는 건 예측·표현형**(특히 JEPA류)이고, 생성·영상형은 인상적이지만 제어 신뢰성은 아직이다.
 
-→ 각 모델의 수식·수치·알고리즘 심화는 [World Models](world-models/latent.md) 트랙에서 논문 원문 대조로 정리했다(Dreamer · PlaNet · MuZero · V-JEPA-2 · 생성형 WM).
+→ 각 모델의 수식·수치·알고리즘 심화는 [World Models](world-models/latent.md) 트랙에서 논문 원문 대조로 정리했다 — [Latent](world-models/latent.md)(PlaNet·Dreamer V1/V2/V3·MuZero) · [Sequence](world-models/sequence.md)(DT·TT) · [Predictive](world-models/predictive.md)(V-JEPA 1/2) · [Generative](world-models/generative.md)(GameNGen·Genie·DIAMOND·Cosmos).
 
 ## 4. 공부 방향 메모 (개인)
 
