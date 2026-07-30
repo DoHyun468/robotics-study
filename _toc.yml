@@ -15,22 +15,20 @@ parts:
       - file: concepts
   - caption: Paper Reviews
     chapters:
-      - file: reviews/index
+      - file: reviews/openvla
+      - file: reviews/graspnet
+      - file: reviews/zerograsp
+      - file: world-models/index
         sections:
-          - file: reviews/openvla
-          - file: reviews/graspnet
-          - file: reviews/zerograsp
-          - file: world-models/index
-            sections:
-              - file: world-models/planet
-              - file: world-models/dreamer
-              - file: world-models/muzero
-              - file: world-models/dreamerv2
-              - file: world-models/dreamerv3
-              - file: world-models/vjepa
-              - file: world-models/vjepa2
-              - file: world-models/gamengen
-              - file: world-models/genie
-              - file: world-models/diamond
-              - file: world-models/cosmos
-          - file: reviews/_template
+          - file: world-models/planet
+          - file: world-models/dreamer
+          - file: world-models/muzero
+          - file: world-models/dreamerv2
+          - file: world-models/dreamerv3
+          - file: world-models/vjepa
+          - file: world-models/vjepa2
+          - file: world-models/gamengen
+          - file: world-models/genie
+          - file: world-models/diamond
+          - file: world-models/cosmos
+      - file: reviews/_template

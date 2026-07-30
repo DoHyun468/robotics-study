@@ -1,6 +1,6 @@
 # World Models — 심화 리뷰
 
-[논문 리뷰](../reviews/index.md)의 **하위 트랙**으로, world model 계열을 **유형별로** 정리했다. 우리가 직접 돌린 실습 리뷰(OpenVLA·GraspNet·ZeroGrasp)와 달리, 이 트랙은 world model의 최전선을 논문 원문(arXiv) 대조로 정리한다. 수치·주장은 논문 원문(arXiv) 기준으로만 적고, 확인되지 않은 값은 "미확인"으로 표기한다. 개념적 위치는 [Concepts](../concepts.md) 참고.
+**Paper Reviews**의 하위 트랙으로, world model 계열을 **유형별로** 정리했다. 우리가 직접 돌린 실습 리뷰([OpenVLA](../reviews/openvla.md)·[GraspNet-1B](../reviews/graspnet.md)·[ZeroGrasp](../reviews/zerograsp.md))와 달리, 이 트랙은 world model의 최전선을 논문 원문(arXiv) 대조로 정리한다. 수치·주장은 논문 원문(arXiv) 기준으로만 적고, 확인되지 않은 값은 "미확인"으로 표기한다. 개념적 위치는 [Concepts](../concepts.md) 참고.
 
 ## 유형 분류
 
