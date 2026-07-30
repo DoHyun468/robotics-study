@@ -1,0 +1,3 @@
+# Classic (Sphinx-based) Jupyter Book. Do NOT use >=1.0 — that pulls the new
+# MyST CLI, which expects myst.yml and will NOT build this _config.yml/_toc.yml.
+jupyter-book==0.15.1

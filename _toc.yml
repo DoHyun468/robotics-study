@@ -1,0 +1,23 @@
+format: jb-book
+root: intro
+parts:
+  - caption: Camera → Robot
+    chapters:
+      - file: perception
+      - file: manipulation
+  - caption: Learned Grasping & Policies
+    chapters:
+      - file: grasp_sota
+      - file: vla
+      - file: context
+  - caption: Concepts
+    chapters:
+      - file: concepts
+  - caption: Paper Reviews
+    chapters:
+      - file: reviews/index
+        sections:
+          - file: reviews/openvla
+          - file: reviews/graspnet
+          - file: reviews/zerograsp
+          - file: reviews/_template

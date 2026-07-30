@@ -1,0 +1,26 @@
+title: "Robotics Study · Spatial Intelligence → Embodied"
+author: Dohyun Kim
+copyright: "2026"
+only_build_toc_files: true
+execute:
+  execute_notebooks: "off"
+html:
+  use_repository_button: true
+  use_issues_button: false
+  home_page_in_navbar: false
+repository:
+  url: https://github.com/DoHyun468/robotics-study
+  branch: main
+parse:
+  myst_enable_extensions:
+    - dollarmath
+    - amsmath
+    - colon_fence
+    - deflist
+    - html_image
+sphinx:
+  config:
+    html_show_copyright: false
+    html_last_updated_fmt: "%Y-%m-%d"
+    html_css_files:
+      - custom.css
