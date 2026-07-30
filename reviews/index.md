@@ -6,4 +6,4 @@
 - [GraspNet-1B](graspnet.md) — 6-DoF grasp 검출의 기준선. Windows/WSL에서 컴파일·통합해 bin picking A/B에 투입.
 - [ZeroGrasp](zerograsp.md) — 2025 SOTA. open-tray A/B에서 학습 grasp 1위 → [Grasp SOTA A/B](../grasp_sota.md).
 
-*world-model 계열(Dreamer · PlaNet · MuZero · V-JEPA-2 · 생성형 WM)은 직접 돌린 게 아니라 **논문 원문 대조 기반 정리**라 별도 [World Models](../world-models/index.md) 트랙으로 분리했다. 개념적 위치는 [Concepts](../concepts.md).*
+**[World Models](../world-models/index.md)** — Dreamer · PlaNet · MuZero · V-JEPA-2 · 생성형 WM 등 world model 계열은 직접 돌린 게 아니라 **논문 원문(arXiv) 대조 기반 정리**라, 아래 하위 트랙으로 묶어 **유형별**(Latent · Predictive · Generative)로 정리했다. 개념적 위치는 [Concepts](../concepts.md).
