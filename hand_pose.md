@@ -85,6 +85,23 @@ E1에서 "키포인트로는 shape가 안 잡힌다"를 봤다. 이걸 대조 �
 
 **카메라 위치 오차는 거의 1:1로 전파**(10mm 캘리브 오차 → 10.96mm 관절오차), 회전·초점도 단조 증가. [perception 파이프라인](perception.md)에서 "정확도 병목은 제어가 아니라 캘리브·기하"라 한 결론이 파라메트릭 손 피팅에서도 그대로 — **캘리브가 데이터·복원 품질의 상한**이다.
 
-```{note}
-**다음 실험 (진행 예정)** — **E6** MANO→로봇 그리퍼 retargeting: 손 파지를 2지 평행 그리퍼(개폐 + 6-DoF 손목)로 옮겨 MuJoCo에서 실행. 사람 손 → 로봇 action을 잇는 축([H2O](reviews/h2o.md)/[UMI](reviews/umi.md) 계열)이자, 우리 [매니퓰레이션](manipulation.md) 스택과의 연결.
-```
+## E6 — MANO → 로봇 그리퍼 retargeting → 물리 pick
+
+사람 손 파지를 로봇 action으로 옮기는 단계([H2O](reviews/h2o.md)/[UMI](reviews/umi.md) 축). MANO 파지에서 **개폐폭**(thumb–index span)과 **grasp yaw**(opening 축)를 뽑아 평행 그리퍼 명령으로 매핑하고, 실제로 박스를 집어 든다.
+
+**매핑은 쉽다 — 물리 실행이 어렵다.** 두 가지 실행을 비교했다:
+
+| 실행 방식 | 결과 | 비고 |
+|---|---|---|
+| 자체 플로팅 그리퍼(직접 작성) | **0/12** | 매핑(개폐폭 MAE 3.71mm)은 맞으나, lift 시 **파지가 미끄러져 박스 이탈**(접촉·grip 튜닝 실패) |
+| **검증된 Franka Panda pick 스택 재사용** | **10/10** | MANO yaw+aperture를 우리 [매니퓰레이션](manipulation.md) pick(DLS IK + PD + 접촉물리)에 주입 → 매번 파지·인상 성공(172–200mm) |
+
+<video src="_static/mano_retarget_panda.mp4" controls loop muted playsinline style="width:100%;max-width:720px;border-radius:8px"></video>
+
+*MANO 파지에서 유도한 yaw·개폐폭으로 Franka Panda가 박스를 집어 든다 (10/10).*
+
+**교훈(정직):** retargeting의 기하 매핑(손 파지→그리퍼 개폐·자세)은 어렵지 않다. 진짜 난관은 **접촉 물리로 실제 들어올리는 실행**이고, 이건 co-tune된·검증된 제어 스택이 있어야 풀린다 — 우리가 이미 실측으로 쌓은 [매니퓰레이션](manipulation.md) pick이 정확히 그 역할을 했다. (자체 그리퍼의 실패도 그대로 기록: 안 되는 건 안 된다고.)
+
+## 정리
+
+강체 6-DoF([perception](perception.md)) → **관절체 파라메트릭 손**(E1–E5) → **사람 손→로봇 action**(E6)으로 이어지는 실측 사슬. 파라메트릭 모델 피팅(멀티뷰·정규화·오차전파·shape 관측성)과 human-to-robot retargeting을 읽은 것([SMPL·MANO](reviews/smpl-mano.md)·[H2O](reviews/h2o.md))에서 **직접 측정한 것**으로 옮겼다.
