@@ -54,5 +54,5 @@ Dreamer · PlaNet · MuZero · V-JEPA-2 · 생성형 WM — arXiv 원문 대조 
 ::::
 
 <p class="rs-foot">
-스택: MuJoCo(Franka Panda) · WSL2/RTX 4090 · 고전 파이프라인(기하 perception + DLS IK + PD 제어) + 학습(GraspNet · OpenVLA · …). 논문 리뷰·World Models는 사이드바 **Paper Reviews** 참조. 개인 스터디 — 회사와 무관.
+스택: MuJoCo(Franka Panda) · WSL2/RTX 4090 · 고전 파이프라인(기하 perception + DLS IK + PD 제어) + 학습(GraspNet · OpenVLA · …). 논문 리뷰·World Models는 사이드바 <strong>Paper Reviews</strong> 참조. 개인 스터디 — 회사와 무관.
 </p>

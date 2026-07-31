@@ -44,7 +44,7 @@ $$
 \underbrace{\|\hat r - r\|^2}_{\text{보상}} \;+\; c_2\underbrace{\big\|Q_\theta(z,a) - \big(r + \gamma Q_{\theta^-}(z',\pi_\theta(z'))\big)\big\|^2}_{\text{가치 TD}} \;+\; c_3\underbrace{\big\|d_\theta(z,a) - h_{\theta^-}(s')\big\|^2}_{\text{잠재 일관성}}
 $$
 
-셋째 항이 이 논문의 재료다 — **"다음 잠재 예측이, 다음 관측을 인코딩한 것과 같아야 한다"**는 잠재 일관성(latent consistency). 재구성 없이도 동역학이 관측에 정박(anchor)되는 장치로, [MuZero](muzero.md)(정박 없음, 보상·가치로만 간접 형성)와 [PlaNet](planet.md)(픽셀 재구성으로 정박)의 정확히 중간 지점이다.
+셋째 항이 이 논문의 재료다 — "**다음 잠재 예측이, 다음 관측을 인코딩한 것과 같아야 한다**"는 잠재 일관성(latent consistency). 재구성 없이도 동역학이 관측에 정박(anchor)되는 장치로, [MuZero](muzero.md)(정박 없음, 보상·가치로만 간접 형성)와 [PlaNet](planet.md)(픽셀 재구성으로 정박)의 정확히 중간 지점이다.
 
 ### 2.2 계획 — MPPI + 가치 terminal + 정책 warm-start
 

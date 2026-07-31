@@ -8,7 +8,7 @@ Assran 외 (Meta AI), *V-JEPA 2: Self-Supervised Video Models Enable Understandi
 
 ## 한 줄 요약
 
-[V-JEPA](vjepa.md)가 확립한 "픽셀이 아니라 표현공간에서 예측한다"는 원칙을 **100만 시간+ 인터넷 영상**으로 키우고, 그 위에 **행동 조건 world model(V-JEPA 2-AC)**을 라벨 없는 로봇 영상 **62시간 미만**으로 얹어, **처음 보는 두 실험실의 Franka 팔에서 zero-shot 픽앤플레이스**를 목표 이미지 계획만으로 해냈다. world model 3축 중 "로봇 실용 최전선"이라는 평가의 근거가 되는 논문.
+[V-JEPA](vjepa.md)가 확립한 "픽셀이 아니라 표현공간에서 예측한다"는 원칙을 **100만 시간+ 인터넷 영상**으로 키우고, 그 위에 **행동 조건 world model**(V-JEPA 2-AC)을 라벨 없는 로봇 영상 **62시간 미만**으로 얹어, **처음 보는 두 실험실의 Franka 팔에서 zero-shot 픽앤플레이스**를 목표 이미지 계획만으로 해냈다. world model 3축 중 "로봇 실용 최전선"이라는 평가의 근거가 되는 논문.
 
 ---
 

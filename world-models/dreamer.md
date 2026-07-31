@@ -4,7 +4,7 @@ Hafner, Lillicrap, Ba, Norouzi, *Dream to Control: Learning Behaviors by Latent 
 
 ## 한 줄 요약
 
-관측을 **잠재 상태(latent state)**로 압축하는 world model(RSSM)을 배우고, **실제 환경이 아니라 그 모델 안(=상상)**에서 actor-critic으로 행동을 학습한다. 이미지 입력 연속제어 20개 태스크에서, 잠재 궤적을 따라 actor 그래디언트를 직접 backprop(pathwise)해 당시 model-based·model-free 베이스라인을 데이터 효율·최종 성능 모두에서 능가했다.
+관측을 **잠재 상태**(latent state)로 압축하는 world model(RSSM)을 배우고, **실제 환경이 아니라 그 모델 안**(=상상)에서 actor-critic으로 행동을 학습한다. 이미지 입력 연속제어 20개 태스크에서, 잠재 궤적을 따라 actor 그래디언트를 직접 backprop(pathwise)해 당시 model-based·model-free 베이스라인을 데이터 효율·최종 성능 모두에서 능가했다.
 
 ---
 
@@ -69,7 +69,7 @@ $$
 - KL 항: **관측 없이 예측하는 prior가, 관측 본 posterior를 따라오게** 하라. 이게 곧 "동역학이 정확하다"는 뜻.
 - V1은 KL이 0으로 붕괴하는 걸 막으려 **free nats**(KL을 일정 값 이하로는 벌하지 않음, 3 nats)를 쓴다.
 
-> V2/V3에서 이 KL이 **KL balancing**과 **free bits(1 nat)**로 바뀐다 → [DreamerV2](dreamerv2.md)·[DreamerV3](dreamerv3.md) 참고.
+> V2/V3에서 이 KL이 **KL balancing**과 **free bits**(1 nat)로 바뀐다 → [DreamerV2](dreamerv2.md)·[DreamerV3](dreamerv3.md) 참고.
 
 ### 2.3 잠재 상상에서의 Actor-Critic (Dreamer의 진짜 기여)
 
@@ -151,7 +151,7 @@ $$
 ## 4. 스터디와의 개념적 연결
 
 - **관측 → 잠재 상태 압축**은 우리 파이프라인의 "인지 → 상태 요약"과 같은 축이다. RSSM의 posterior는 사실상 관측을 **저차원 표현**으로 인코딩하는 것으로, 우리가 다룬 point cloud/pose 추정이 관측을 **기하 상태**로 요약하는 것과 개념적으로 대응한다.
-- **샘플효율(상상에서 학습)**은 실제 로봇 학습의 핵심 제약과 직결. 이 사이트의 [perception](../perception.md) 파이프라인에서 확인한 "실환경 데이터가 비싸다"는 문제의 정공법 중 하나가 world model 기반 상상 학습이다.
+- **샘플효율**(상상에서 학습)은 실제 로봇 학습의 핵심 제약과 직결. 이 사이트의 [perception](../perception.md) 파이프라인에서 확인한 "실환경 데이터가 비싸다"는 문제의 정공법 중 하나가 world model 기반 상상 학습이다.
 - **prior/posterior KL = 동역학의 예측가능성**. 관측 없이 prior만으로 미래를 굴릴 수 있어야 한다는 요구는, 우리 markerless ICP에서 "부분 관측만으로 pose를 복원"하려던 관측성(observability) 논의와 같은 결의 문제다.
 - **주의(개인 방향과의 정합)**: 우리 트랙 개인 방향은 "RL은 언어 수준 이해까지, WM은 예측형(JEPA) 위주"다. Dreamer는 **보상 기반 WM-RL** 계열이라, 예측형(V-JEPA)과는 신호가 다르다(보상 vs 자기지도 표현). 계보의 뿌리로서 이해하되, 직접 실습 앵커로 삼진 않는다.
 

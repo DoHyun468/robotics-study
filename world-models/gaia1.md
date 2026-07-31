@@ -6,7 +6,7 @@ Hu, Russell, Yeo 외 (Wayve), *GAIA-1: A Generative World Model for Autonomous D
 
 같은 갈래: [GameNGen](gamengen.md) · [Genie](genie.md) · [Cosmos](cosmos.md) · [생성·영상형 개요](generative.md)
 
-**생성·영상형 world model**이 게임([GameNGen](gamengen.md))·오픈 세계([Genie](genie.md))를 넘어 **실제 안전-임계 도메인(자율주행)**에 정면으로 들어온 사례. [Cosmos](cosmos.md)보다 1년+ 앞서, "주행 world model = 영상 토큰의 자기회귀 언어 모델링"이라는 설계와 **LLM식 스케일링 법칙의 성립**을 보였다.
+**생성·영상형 world model**이 게임([GameNGen](gamengen.md))·오픈 세계([Genie](genie.md))를 넘어 **실제 안전-임계 도메인**(자율주행)에 정면으로 들어온 사례. [Cosmos](cosmos.md)보다 1년+ 앞서, "주행 world model = 영상 토큰의 자기회귀 언어 모델링"이라는 설계와 **LLM식 스케일링 법칙의 성립**을 보였다.
 
 ---
 

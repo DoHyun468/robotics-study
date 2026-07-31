@@ -14,7 +14,7 @@ NVIDIA, *Cosmos World Foundation Model Platform for Physical AI*, 2025 (arXiv 25
 
 로봇·자율주행 정책을 학습시키려면 "행동해 보고 결과를 겪는" 데이터가 필요한데, 실세계에서 이건 **비싸고 느리고 위험하다**. 원문의 프레이밍이 명료하다:
 
-> "Physical AI는 먼저 디지털로 학습해야 한다. 자신의 디지털 트윈(정책 모델)과 **세계의 디지털 트윈(world model)**이 필요하다."
+> "Physical AI는 먼저 디지털로 학습해야 한다. 자신의 디지털 트윈(정책 모델)과 **세계의 디지털 트윈**(world model)이 필요하다."
 
 그래서 Cosmos의 목표는 특정 태스크의 제어기가 아니다. **일반 목적의 세계 시뮬레이터를 사전학습해 두고**, 각 응용(조작·주행·카메라 제어)이 그걸 파인튜닝해 쓰게 하자는 것 — LLM의 "foundation model → downstream 파인튜닝" 패러다임을 world model에 이식한 구도다. 이 관점에서는 생성형 WM의 고질적 약점(정밀 제어 미흡)이 치명적이지 않다. **제어는 downstream 정책의 몫이고, WFM은 데이터와 예측을 공급**하면 된다.
 

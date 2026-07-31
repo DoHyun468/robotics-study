@@ -6,7 +6,7 @@ Iwase 외, *ZeroGrasp: Zero-Shot Shape Reconstruction Enabled Robotic Grasping*,
 
 ## 한 줄 요약
 
-> RGB-D + per-object 인스턴스 마스크를 받아 **물체별 3D 재구성(octree)** 을 먼저 하고 그 표면 위에서 grasp을 예측하는 CVPR'25 모델 — "가려서 안 보이는 뒷면까지 복원한 뒤 잡는다"는 reconstruction-first 접근. 우리 WSL2 6모델 A/B에서 open tray 학습 모델 중 **1위(50%)**를 실측했다.
+> RGB-D + per-object 인스턴스 마스크를 받아 **물체별 3D 재구성(octree)** 을 먼저 하고 그 표면 위에서 grasp을 예측하는 CVPR'25 모델 — "가려서 안 보이는 뒷면까지 복원한 뒤 잡는다"는 reconstruction-first 접근. 우리 WSL2 6모델 A/B에서 open tray 학습 모델 중 **1위**(50%)를 실측했다.
 
 ## 문제 — 부분 관측에서 잡기, 그리고 "2020 이후 SOTA가 있나"
 

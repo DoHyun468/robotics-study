@@ -26,7 +26,7 @@ grasp가 유지되는지, 옮기는 중 안 떨어지는지가 전부 물리 스
 | perception 오차 | 6.59mm (mean) |
 | place 오차 | 4.87mm (mean, 성공분) |
 
-**디버깅 발견.** 첫 실행은 place 성공률 **72%**였다. perception·grasp-lift는 100%인데 place만 5/18이 ~93–104mm 밖으로 튀었다. "그립이 약한가"로 추측하지 않고 단계별 위치 텔레메트리로 원인을 분해했다: carry 후~release 직전까지 물체는 전부 타겟(≈445, 180mm)에 정확히 있었다 — 인지·IK·grasp·운반은 무결. final 위치만 튀었고, 튄 방향이 전부 pick 위치 쪽(+x, −y)으로 일관됐다. 범인은 retract 한 줄: release 후 복귀 자세를 pick 위 자세(`q_lift`)로 줘서, 열린 그리퍼가 방금 놓은 물체를 pick 방향으로 쓸고 지나갔다(똑바로 밀리면 ~95mm/z=226, 옆으로 넘어지면 40–50mm/z=222 — 같은 원인). retract를 place 타겟 바로 위(`q_pup`)로 수직 상승시키자 **72% → 100%**, place 오차 18.1 → 4.87mm로 떨어졌다.
+**디버깅 발견.** 첫 실행의 place 성공률은 **72%**. perception·grasp-lift는 100%인데 place만 5/18이 ~93–104mm 밖으로 튀었다. "그립이 약한가"로 추측하지 않고 단계별 위치 텔레메트리로 원인을 분해했다: carry 후~release 직전까지 물체는 전부 타겟(≈445, 180mm)에 정확히 있었다 — 인지·IK·grasp·운반은 무결. final 위치만 튀었고, 튄 방향이 전부 pick 위치 쪽(+x, −y)으로 일관됐다. 범인은 retract 한 줄: release 후 복귀 자세를 pick 위 자세(`q_lift`)로 줘서, 열린 그리퍼가 방금 놓은 물체를 pick 방향으로 쓸고 지나갔다(똑바로 밀리면 ~95mm/z=226, 옆으로 넘어지면 40–50mm/z=222 — 같은 원인). retract를 place 타겟 바로 위(`q_pup`)로 수직 상승시키자 **72% → 100%**, place 오차 18.1 → 4.87mm로 떨어졌다.
 
 교훈: 성공률이 애매할 때 어느 단계에서 깨지는지 계측하면 추측 없이 한 줄로 고쳐진다. perception이 아니라 **동작 계획(복귀 경로)** 결함이었다는 게 포인트 — perception 정확도가 전부를 결정한다는 통념과는 다른 축(계획/실행)의 실패 모드였다.
 
@@ -75,7 +75,7 @@ seed 5는 6/6 완전 clearance.
 - **비수직 접근도 간단한 해법은 아니다.** 전방 하향 카메라가 관측한 top-surface 법선은 앞면 픽셀이 섞여 GT와 안 맞는다(0°→45° 오차) — 신뢰할 수 없다. 안전한 tilted grasp에는 신뢰할 법선 + 강건한 grasp 계획(GraspNet급)이 필요하다.
 - 확인된 레버: grasp 깊이(✓ 33→63%)·drop 슬롯 분산(✓ lost→0). 무효 레버: 조리개(✗)·yaw π/2 플립(✗ 악화).
 
-단순 top-down 휴리스틱의 정직한 천장은 **≈63%**다. bin 벽을 제거한 open-tray 조건에서는 같은 휴리스틱이 **77%**까지 오른다(walled가 near-vertical grasp을 강제해 안정적인 자세를 더 많이 허용하기 때문) — 다만 그 이상으로 벽 유무를 넘나드는 grasp 전략 비교(GraspNet 등 학습 기반 6-DoF grasp)는 grasp_sota.md에서 별도로 다룬다. 여기서 확인할 결론은: 인지·순서·place는 견고하고, **grasp 전략(수직 top-down 평행 그리퍼)이 유일한 병목**이라는 것.
+단순 top-down 휴리스틱의 정직한 천장은 **≈63%**. bin 벽을 제거한 open-tray 조건에서는 같은 휴리스틱이 **77%**(+14%p)까지 오른다(walled가 near-vertical grasp을 강제해 안정적인 자세를 더 많이 허용하기 때문) — 다만 그 이상으로 벽 유무를 넘나드는 grasp 전략 비교(GraspNet 등 학습 기반 6-DoF grasp)는 grasp_sota.md에서 별도로 다룬다. 여기서 확인할 결론은: 인지·순서·place는 견고하고, **grasp 전략(수직 top-down 평행 그리퍼)이 유일한 병목**이라는 것.
 
 <img src="_static/bin_pick_montage.png" style="width:100%;max-width:820px;border-radius:8px">
 
@@ -171,7 +171,7 @@ python src/insert.py seed=5 clr=0.006 --render      # 단일 + 영상
 
 ### 5. Sorting / kitting — 평균 96.7%
 
-**목표.** 여기서는 인지와 동작 **사이에 결정(decision)**이 들어간다. 두 색 박스가 섞여 흩어져 있고, 색마다 목적지 존이 하나다. 로봇은 각 박스를 인지 → RGB 렌더에서 색을 읽어 분류(GT 라벨 아님) → 집어 → 맞는 색 존에 놓는다. 헤드라인은 sort accuracy(맞는 존/전체)·classify accuracy.
+**목표.** 여기서는 인지와 동작 **사이에 결정**(decision)이 들어간다. 두 색 박스가 섞여 흩어져 있고, 색마다 목적지 존이 하나다. 로봇은 각 박스를 인지 → RGB 렌더에서 색을 읽어 분류(GT 라벨 아님) → 집어 → 맞는 색 존에 놓는다. 헤드라인은 sort accuracy(맞는 존/전체)·classify accuracy.
 
 **방법(인지 → 분류 → 배치).** 씬은 오픈 테이블 + 색 존 2개(파랑 좌 [0.44, 0.22]·주황 우 [0.53, 0.22]) + 박스 6개(색 2종 랜덤 배정) 흩어 안착. bin picking의 카메라/IK/perceive를 재사용한다. 인지+분류는 stacking의 `top_center`(top면 grasp 중심) + `classify_color`: 박스 세그 마스크의 평균 RGB를 렌더에서 읽어 두 기준색과 최근접 분류한다 — GT 색 라벨을 안 쓰고 실제 카메라 분류 단계를 시뮬레이션한다. grasp/place는 top-down grasp → 예측 색의 존으로 운반(슬롯 분산으로 겹침 방지) → release → 수직상승 → home(stacking/단일 pick-place 교훈 반영). 소스(존 밖) 박스가 없을 때까지 최상단 우선 반복한다. 판정은 박스가 예측한 색 존 안 + 그 예측이 GT와 일치하면 sorted OK.
 

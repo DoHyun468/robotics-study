@@ -23,9 +23,17 @@ html[data-theme="light"] {
   --pst-color-secondary:    #10897a;
 }
 
-/* link + active-nav fallbacks (in case theme ignores the vars) */
-a.reference, a.reference:visited { color: var(--rs-accent); }
-a.reference:hover { color: var(--rs-accent-hover); }
+/* link + active-nav fallbacks (in case theme ignores the vars)
+   — accent is for CONTENT links only; nav/TOC visited must not keep highlight */
+article a.reference, article a.reference:visited { color: var(--rs-accent); }
+article a.reference:hover { color: var(--rs-accent-hover); }
+
+/* sidebar/TOC: visited looks identical to unvisited (no read-history trail) */
+.bd-sidebar-primary a:visited:not(.current),
+nav.bd-links a:visited:not(.current),
+.bd-toc a:visited:not(.active),
+nav.page-toc a:visited:not(.active) { color: inherit; }
+
 .bd-sidebar-primary a.current,
 .bd-sidebar-primary .current > a { color: var(--rs-accent) !important; font-weight: 600; }
 .bd-toc a.active, nav.page-toc a.active { color: var(--rs-accent) !important; }
