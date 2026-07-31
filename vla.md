@@ -49,6 +49,18 @@ spatial suite 기준으로는 20 에피소드 중 **16/20 = 80% 성공**, 실패
 
 20개 롤아웃 전부 성공/실패 라벨을 붙여 저장했고, 그중 대표 3개(성공 2 + 실패 1)를 위에 임베드했다.
 
+## ER 2 (Gemini Robotics) — 같은 LIBERO 태스크에 추론 붙이기
+
+OpenVLA가 LIBERO 태스크를 **실행**한다면, 2026-07-30 출시된 [Gemini Robotics-ER 2](reviews/gemini-robotics.md)(임베디드 추론)는 같은 씬을 **추론**한다. 행동 VLA는 게이트라 못 돌리지만 **ER 2는 API 공개**라, 우리가 OpenVLA로 돌린 LIBERO 롤아웃 씬에 ER 2를 직접 붙여봤다(클라우드, GPU 무관).
+
+<img src="_static/er2_libero.png" alt="ER2 embodied reasoning on our LIBERO task scenes" style="width:100%;max-width:1100px;border-radius:8px">
+
+*3개 LIBERO 씬에서 ER 2가 태스크 추론 + pick(초록)·place(주황) 포인트 + 단계 계획을 냈다 — 단일 RGB 한 장으로 "어디를 집어 어디에 놓을지"를 바로.*
+
+- ER 2는 **어디를/어디에(where)+계획**을 주고, 실제 **action rollout은 OpenVLA(또는 게이트된 행동 VLA)의 몫** — 추론과 실행의 분업.
+- 이미지 한 장에서 open-vocab 물체·접시(target)·grasp 포인트를 바로 낸 것은, 우리 [context 사다리](context.md)의 L1(기하)·L2(OWL-ViT)를 로보틱스-튜닝 VLM이 한 번에 하는 셈. ER2 grasp 포인팅·언어 grounding 상세는 [Gemini Robotics 2 리뷰](reviews/gemini-robotics.md).
+- 정직: ER2의 "태스크"는 이미지에서 **추론한 것**(실제 LIBERO 지시문과 다를 수 있음), pick/place 포인트도 정성 확인(n=3).
+
 ## 자체 LoRA 파인튜닝 — 파이프라인은 동작, 단 짧은 run은 undertrain
 
 평가만 재현하는 걸 넘어, 단일 4090에서 `openvla-7b` 베이스 위에 **LoRA 파인튜닝을 처음부터 끝까지 직접 돌렸다**: RLDS 데이터 변환 → LoRA 학습(`finetune.py`) → 어댑터 merge → LIBERO eval — **파이프라인 자체는 end-to-end로 정상 구동**한다.
