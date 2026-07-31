@@ -21,4 +21,14 @@ VLA는 **모방(시연)** 신호로, [world-model RL](../world-models/latent.md)
 
 VLA가 소비하는 **시연 데이터의 공급 측**(사람 동작 캡처·retargeting·핸드헬드 수집)은 별도 카테고리 [Human Motion → Robot Data](humanmotion.md)에서 다룬다.
 
-*향후: Octo · RT-2 · π0 등 추가 예정.*
+## 다른 VLA 리뷰
+
+우리가 직접 돌린 [OpenVLA](openvla.md) 외에, 계열을 넓혀 문헌 리뷰로 정리한 VLA들:
+
+- [RT-2 (2023)](rt2.md) — 웹 지식 → 로봇 제어로 이식한 **닫힌 원조**(OpenVLA가 "연" 대상).
+- [Octo (2024)](octo.md) — **오픈 제너럴리스트** 정책(diffusion head, 93M) — LIBERO에서 7B OpenVLA와 맞먹음.
+- [π0 (2024)](pi0.md) — **flow-matching 연속 action**, dexterous. openpi 오픈.
+- [RDT-1B (2024)](rdt.md) — 1B **diffusion** VLA, 양손(bimanual).
+- [Gemini Robotics 2 (2026)](gemini-robotics.md) — 전신·양손·다로봇, 3-모델(행동 VLA 게이트, ER2만 API).
+
+축으로 보면: **닫힘→오픈**(RT-2→OpenVLA), **이산 토큰→연속/확산 action**(OpenVLA→π0·RDT), **테이블탑→전신**(→Gemini Robotics 2).

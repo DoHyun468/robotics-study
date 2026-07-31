@@ -25,6 +25,11 @@ parts:
       - file: reviews/vla
         sections:
           - file: reviews/openvla
+          - file: reviews/rt2
+          - file: reviews/octo
+          - file: reviews/pi0
+          - file: reviews/rdt
+          - file: reviews/gemini-robotics
       - file: reviews/humanmotion
         sections:
           - file: reviews/smpl-mano
