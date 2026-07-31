@@ -60,7 +60,31 @@
 python src/mano_fit.py --mano_dir <MANO_dir> --sweep --render
 ```
 
+## E4 — shape(β)는 표면 관측이 있어야 잡힌다
+
+E1에서 "키포인트로는 shape가 안 잡힌다"를 봤다. 이걸 대조 실험으로 확인한다: 관측을 (a) **관절 키포인트만** vs (b) **관절 + 표면 대응점 200개**(실루엣/표면이 주는 정보의 대리)로 두고 각각 피팅.
+
+<img src="_static/mano_e4.png" alt="shape observability" style="width:100%;max-width:520px;border-radius:8px">
+
+| 관측 | 관절오차 | **버텍스오차** | **β 오차** |
+|---|---|---|---|
+| joints only | 0.46mm | 1.42mm | 1.71 |
+| **+ surface (200pt)** | 0.37mm | **0.37mm (−74%)** | **1.11** |
+
+표면 대응점을 더하면 버텍스 오차가 1.42→0.37mm로 무너지고 β 오차도 준다. **키포인트는 pose를, 표면은 shape를 제약한다** — 체형까지 복원하려면 실루엣·표면 항이 필요하다는 걸 실측으로 확인. (β는 본질적으로 어려워 완전히 0은 안 되지만 방향은 뚜렷.)
+
+## E5 — 캘리브 오차가 손 관절오차로 전파
+
+관측은 **참(true) 카메라**로 만들고, 피팅만 **섭동된(miscalibrated) 카메라**로 하면, 캘리브 오차가 3D 복원오차로 얼마나 새는지 측정된다 — [perception 오차예산](perception.md)의 관절체판.
+
+<img src="_static/mano_e5.png" alt="calibration error propagation" style="width:100%;max-width:960px;border-radius:8px">
+
+| 섭동 | baseline | 회전 0.5°/1°/2° | 위치 2/5/10mm | 초점 0.5/1/2% |
+|---|---|---|---|---|
+| 관절 복원오차 | 0.44mm | 0.56 / 0.82 / 1.43mm | 2.18 / 5.47 / **10.96mm** | 0.54 / 0.79 / 1.4mm |
+
+**카메라 위치 오차는 거의 1:1로 전파**(10mm 캘리브 오차 → 10.96mm 관절오차), 회전·초점도 단조 증가. [perception 파이프라인](perception.md)에서 "정확도 병목은 제어가 아니라 캘리브·기하"라 한 결론이 파라메트릭 손 피팅에서도 그대로 — **캘리브가 데이터·복원 품질의 상한**이다.
+
 ```{note}
-**다음 실험 (진행 예정)** — 매니퓰레이션 스위트처럼 축을 넓힌다:
-**E4** shape 관측성(키포인트 vs +실루엣) · **E5** 캘리브 오차 전파(카메라 외/내부 섭동→피팅 열화) · **E6** MANO→로봇 그리퍼 retargeting(손 파지를 2지 그리퍼로 옮겨 MuJoCo 실행).
+**다음 실험 (진행 예정)** — **E6** MANO→로봇 그리퍼 retargeting: 손 파지를 2지 평행 그리퍼(개폐 + 6-DoF 손목)로 옮겨 MuJoCo에서 실행. 사람 손 → 로봇 action을 잇는 축([H2O](reviews/h2o.md)/[UMI](reviews/umi.md) 계열)이자, 우리 [매니퓰레이션](manipulation.md) 스택과의 연결.
 ```
