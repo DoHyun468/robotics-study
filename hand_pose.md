@@ -93,7 +93,7 @@ E1에서 "키포인트로는 shape가 안 잡힌다"를 봤다. 이걸 대조 �
 
 사람 손 파지를 로봇 action으로 옮기는 단계([H2O](reviews/h2o.md)/[UMI](reviews/umi.md) 축). **손(MANO)은 아무것도 집지 않는다** — 손 자세에서 "어떻게 잡을지"(개폐폭·각도)만 읽고, **실제로 박스를 집는 건 로봇 팔(Franka Panda)** 이다.
 
-<img src="_static/e6_pipeline.png" alt="E6 pipeline: MANO grasp to gripper to Panda pick" style="width:100%;max-width:1000px;border-radius:8px">
+<img src="_static/e6_pipeline.png" alt="E6 pipeline MANO grasp to gripper to Panda pick" style="width:100%;max-width:1000px;border-radius:8px">
 
 *① MANO 손 파지에서 개폐폭·각도를 읽음 → ② 그리퍼 명령으로 변환 → ③ 로봇 팔이 그 파지로 박스를 집음.*
 
