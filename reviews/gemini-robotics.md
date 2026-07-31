@@ -90,6 +90,20 @@ DeepMind 블로그와 보도에서 확인되는 수치는 다음과 같다. **�
 
 ---
 
+## 우리가 직접 돌려본 것 — ER 2 (public preview)
+
+행동 VLA·On-Device는 게이트라 못 돌리지만, **ER 2(임베디드 추론)는 Gemini API로 접근** 가능하다. 그래서 `gemini-robotics-er-2-preview`를 **우리 씬에 직접 API로 probe**했다(클라우드, GPU 무관).
+
+<img src="../_static/er2_grasp.png" alt="ER2 grasp pointing and language grounding on our scene" style="width:100%;max-width:900px;border-radius:8px">
+
+*단일 이미지 한 장으로 4개 블록의 grasp 포인트 + "blue block" 언어 grounding(흰 ×). ER2의 blue-block 포인트가 우리 [컨텍스트 L2](../context.md)의 OWL-ViT 검출(초록 박스) 안에 들어가 두 방법이 일치했다.*
+
+- ER2는 **단일 RGB 한 장**에서 open-vocab pointing + grasp 추론을 바로 냈다 — 우리 [context 사다리](../context.md)의 L2(OWL-ViT)·L1(기하 규칙)이 하던 "이걸 집어라"를 로보틱스-튜닝 VLM이 한 번에 하는 셈.
+- 단 **추론(어디를)만** 준다 — 실제 action rollout은 게이트된 행동 VLA의 몫. 우리 [매니퓰레이션](../manipulation.md) IK·제어에 붙이면 "ER2가 가리키고 → 우리 스택이 집는" 파이프라인이 된다([손 자세 E6](../hand_pose.md)의 MANO→panda와 같은 구도).
+- 정직: 이 씬에선 ER2 grounding이 OWL-ViT와 일치했으나 **n=1 정성 확인**이다(정량 A/B는 추후).
+
+---
+
 ## 출처
 
 - [Gemini Robotics 2 brings whole body intelligence to robots — Google DeepMind (공식 블로그)](https://deepmind.google/blog/gemini-robotics-2-brings-whole-body-intelligence-to-robots/)
