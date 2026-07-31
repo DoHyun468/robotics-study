@@ -1,6 +1,10 @@
 # 손 자세 추정 — 멀티뷰 MANO 피팅 (실측)
 
-파라메트릭 **손 모델(MANO)** 을 우리 캘리브레이션 스택 위에서 직접 피팅해 본 실측이다. 방법론은 이 사이트의 [perception 파이프라인](perception.md)과 동일 — **GT를 알고, 관측에서 복원하고, 오차를 mm로 잰다** — 단 대상이 강체 6-DoF pose에서 **관절체 파라메트릭 모델**(shape β + pose)로 한 칸 커졌다. 모델 자체 리뷰는 [SMPL·MANO](reviews/smpl-mano.md).
+파라메트릭 **손 모델(MANO)** 을 우리 캘리브레이션 스택 위에서 직접 다뤄 본 실측이다.
+
+**한눈에:** E1–E5는 **손 자체를 카메라로 3D 이해**하는 지각 실험(자세·모양·오차 — 물체를 집는 게 아니다), E6는 그렇게 읽은 **사람 손 파지를 로봇 팔이 따라 집게** 하는 실행 실험이다.
+
+방법론은 이 사이트의 [perception 파이프라인](perception.md)과 동일 — **GT를 알고, 관측에서 복원하고, 오차를 mm로 잰다** — 단 대상이 강체 6-DoF pose에서 **관절체 파라메트릭 모델**(shape β + pose)로 한 칸 커졌다. 모델 자체 리뷰는 [SMPL·MANO](reviews/smpl-mano.md).
 
 ## 방법
 
@@ -87,7 +91,13 @@ E1에서 "키포인트로는 shape가 안 잡힌다"를 봤다. 이걸 대조 �
 
 ## E6 — MANO → 로봇 그리퍼 retargeting → 물리 pick
 
-사람 손 파지를 로봇 action으로 옮기는 단계([H2O](reviews/h2o.md)/[UMI](reviews/umi.md) 축). MANO 파지에서 **개폐폭**(thumb–index span)과 **grasp yaw**(opening 축)를 뽑아 평행 그리퍼 명령으로 매핑하고, 실제로 박스를 집어 든다.
+사람 손 파지를 로봇 action으로 옮기는 단계([H2O](reviews/h2o.md)/[UMI](reviews/umi.md) 축). **손(MANO)은 아무것도 집지 않는다** — 손 자세에서 "어떻게 잡을지"(개폐폭·각도)만 읽고, **실제로 박스를 집는 건 로봇 팔(Franka Panda)** 이다.
+
+<img src="_static/e6_pipeline.png" alt="E6 pipeline: MANO grasp to gripper to Panda pick" style="width:100%;max-width:1000px;border-radius:8px">
+
+*① MANO 손 파지에서 개폐폭·각도를 읽음 → ② 그리퍼 명령으로 변환 → ③ 로봇 팔이 그 파지로 박스를 집음.*
+
+MANO 파지에서 **개폐폭**(thumb–index span)과 **grasp yaw**(opening 축)를 뽑아 평행 그리퍼 명령으로 매핑하고, 실제로 박스를 집어 든다.
 
 **매핑은 쉽다 — 물리 실행이 어렵다.** 두 가지 실행을 비교했다:
 
