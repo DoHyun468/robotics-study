@@ -19,4 +19,6 @@
 
 VLA는 **모방(시연)** 신호로, [world-model RL](../world-models/latent.md)은 **보상** 신호로 배운다 — 문제 설정이 달라 같은 벤치로 직접 비교할 수 없다([Concepts](../concepts.md) 참고). 다만 출력단의 발상은 공유한다: OpenVLA의 action 256-bin 이산화는 [DreamerV3](../world-models/dreamerv3.md)의 twohot, [MuZero](../world-models/muzero.md)의 categorical support와 같은 "연속 회귀 → 이산 분포" 계열이다.
 
+VLA가 소비하는 **시연 데이터의 공급 측**(사람 동작 캡처·retargeting·핸드헬드 수집)은 별도 카테고리 [Human Motion → Robot Data](humanmotion.md)에서 다룬다.
+
 *향후: Octo · RT-2 · π0 등 추가 예정.*

@@ -22,6 +22,11 @@ parts:
       - file: reviews/vla
         sections:
           - file: reviews/openvla
+      - file: reviews/humanmotion
+        sections:
+          - file: reviews/smpl-mano
+          - file: reviews/h2o
+          - file: reviews/umi
       - file: world-models/latent
         sections:
           - file: world-models/world-models-2018
