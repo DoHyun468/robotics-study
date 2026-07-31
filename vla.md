@@ -61,6 +61,20 @@ OpenVLA가 LIBERO 태스크를 **실행**한다면, 2026-07-30 출시된 [Gemini
 - 이미지 한 장에서 open-vocab 물체·접시(target)·grasp 포인트를 바로 낸 것은, 우리 [context 사다리](context.md)의 L1(기하)·L2(OWL-ViT)를 로보틱스-튜닝 VLM이 한 번에 하는 셈. ER2 grasp 포인팅·언어 grounding 상세는 [Gemini Robotics 2 리뷰](reviews/gemini-robotics.md).
 - 정직: ER2의 "태스크"는 이미지에서 **추론한 것**(실제 LIBERO 지시문과 다를 수 있음), pick/place 포인트도 정성 확인(n=3).
 
+## ER 2 — 우리 매니퓰레이션 태스크(bin-pick·stack·sort) 계획
+
+LIBERO 씬을 넘어, **우리가 MuJoCo에서 직접 만든 매니퓰레이션 태스크**([manipulation.md](manipulation.md))에도 ER 2를 붙여 "무엇부터·어디로" 계획을 시켰다. 우리는 이 태스크들을 **기하 휴리스틱**(bin-pick=최상단 우선, stack=순차 적재, sort=색매칭)으로 풀었는데, ER 2의 추론이 그 휴리스틱과 얼마나 맞는지 대조하려는 것.
+
+<img src="_static/er2_tasks.png" alt="ER2 task planning on our bin-pick, stack, sort scenes" style="width:100%;max-width:1200px;border-radius:8px">
+
+*세 씬에 대한 ER 2의 계획(원 안 숫자 = 제안 실행 순서). 씬당 RGB 한 장만 주고 순서/색분류를 물었다.*
+
+- **bin-pick — "어느 것부터?"**: ER 2가 5개 박스의 픽 순서를 내며 "위·비가림(top / unoccluded)된 것 먼저"라고 근거를 댔다 → **우리 top-down grasp의 최상단 우선 휴리스틱과 그대로 일치**.
+- **stack — "쌓는 순서"**: base부터의 적재 순서 + 타워 목표 위치를 냈다(초록 base → …). 우리 순차 적재 로직과 같은 방향.
+- **sort — "색 분류"**: 6개 박스를 색(오렌지 3 / 블루 3)으로 갈라 각각 제 색 존으로 보냈다 → **우리 색매칭 sort와 일치**.
+
+정리하면, **로보틱스-튜닝 VLM(ER 2)의 언어 추론이 우리가 손으로 짠 기하 휴리스틱과 같은 결론에 수렴**한다 — L1(기하)/L2(OWL-ViT)로 명시적으로 짜던 "무엇을·어느 순서로"를 VLM이 한 장에서 바로 낸다. 단, 이는 **계획(where/order)까지**고 실제 action rollout은 여전히 실행 정책의 몫이며, 순서·포인트는 정성 확인(씬당 n=1)이다.
+
 ## 자체 LoRA 파인튜닝 — 파이프라인은 동작, 단 짧은 run은 undertrain
 
 평가만 재현하는 걸 넘어, 단일 4090에서 `openvla-7b` 베이스 위에 **LoRA 파인튜닝을 처음부터 끝까지 직접 돌렸다**: RLDS 데이터 변환 → LoRA 학습(`finetune.py`) → 어댑터 merge → LIBERO eval — **파이프라인 자체는 end-to-end로 정상 구동**한다.
