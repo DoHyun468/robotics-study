@@ -39,6 +39,12 @@ OpenVLA LIBERO 4-suite 재현(논문 정합) + 자체 LoRA 파인튜닝의 정�
 "이걸 집어라"를 전달하는 3단계 — 포인터 → 언어(OWL-ViT) → VLA.
 :::
 
+:::{grid-item-card} Hand Pose (실측)
+:link: hand_pose
+:link-type: doc
+멀티뷰 MANO 피팅 recovery-error — 파라메트릭 손 모델을 우리 캘리브 스택 위에서 직접 측정.
+:::
+
 :::{grid-item-card} Concepts
 :link: concepts
 :link-type: doc

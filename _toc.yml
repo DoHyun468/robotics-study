@@ -10,6 +10,9 @@ parts:
       - file: grasp_sota
       - file: vla
       - file: context
+  - caption: Hand & Human Pose
+    chapters:
+      - file: hand_pose
   - caption: Concepts
     chapters:
       - file: concepts
@@ -25,8 +28,12 @@ parts:
       - file: reviews/humanmotion
         sections:
           - file: reviews/smpl-mano
+          - file: reviews/smplx
+          - file: reviews/hamer
           - file: reviews/h2o
           - file: reviews/umi
+          - file: reviews/grab
+          - file: reviews/hot3d
       - file: world-models/latent
         sections:
           - file: world-models/world-models-2018

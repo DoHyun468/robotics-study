@@ -71,3 +71,13 @@ video, img { max-width: 100%; height: auto; }
 @media (prefers-reduced-motion: reduce) {
   .sd-card, .sd-card:hover { transition: none; transform: none; }
 }
+
+/* --- independent sidebar scroll: sidebar has its own scrollbar, decoupled
+       from main content height (no need to scroll the page to see its bottom) --- */
+.bd-sidebar-primary {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+}

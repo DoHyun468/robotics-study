@@ -17,9 +17,20 @@
 로봇 실행
 ```
 
+**캡처 — 파라메트릭 모델 & 3D pose**
 - [SMPL · MANO (2015·2017)](smpl-mano.md) — 몸(6890버텍스)·손(778버텍스)의 **파라메트릭 모델**. 이 계열 전체의 공통 언어.
+- [SMPL-X (2019)](smplx.md) — 몸+손+얼굴을 하나로 합친 통합 파라메트릭 모델(SMPL+MANO+FLAME) + SMPLify-X 최적화 피팅.
+- [HaMeR (2024)](hamer.md) — 단안 RGB → **MANO 파라미터 회귀**(ViT). 영상에서 손을 바로 뽑는 캡처 프론트엔드.
+
+**retargeting & 시연 수집**
 - [H2O (2024)](h2o.md) — SMPL 피팅 → 휴머노이드 **retargeting** → RL 추적 정책 → **RGB 캠 하나로 실시간 전신 텔레옵**.
 - [UMI (2024)](umi.md) — 핸드헬드 그리퍼로 **로봇 없이 시연 수집** → diffusion policy. 시연 데이터 파이프라인의 실용 최전선.
+
+**상호작용 & 에고센트릭**
+- [GRAB (2020)](grab.md) — 전신 인간의 **물체 파지·조작** MoCap(SMPL-X + 접촉). hand-object interaction의 데이터 기준.
+- [HOT3D (2024)](hot3d.md) — **에고센트릭** 손·물체 3D 추적 데이터셋(Aria/Quest3). 1인칭 wearable 수집.
+
+> 📐 위 파라메트릭 모델을 우리 캘리브 스택에서 **직접 피팅해 본 실측**은 [손 자세 추정 — 멀티뷰 MANO 피팅](../hand_pose.md).
 
 ## 비교표
 
