@@ -79,7 +79,17 @@ LIBERO 씬을 넘어, **우리가 MuJoCo에서 직접 만든 매니퓰레이션 
 
 평가만 재현하는 걸 넘어, 단일 4090에서 `openvla-7b` 베이스 위에 **LoRA 파인튜닝을 처음부터 끝까지 직접 돌렸다**: RLDS 데이터 변환 → LoRA 학습(`finetune.py`) → 어댑터 merge → LIBERO eval — **파이프라인 자체는 end-to-end로 정상 구동**한다.
 
-문제는 학습량이다. GPU 시간 제약으로 돌린 bounded run은 **1500 step ≈ 0.45 epoch**밖에 안 되고, 이 체크포인트로 LIBERO-Spatial을 평가하면 나오는 성공률은 **0%**. 여기서 중요한 건 원인 규명이다 — action normalization 통계(norm stats)를 직접 점검해 정상임을 확인했으므로 **버그가 아니라 순수한 undertrain**이다. 공식 체크포인트(80% 재현)는 이보다 훨씬 오래 학습된 결과이니, 0.45 epoch로는 애초에 수렴할 수 없는 게 당연하다.
+문제는 학습량이다. 첫 bounded run은 **1500 step ≈ 0.45 epoch**밖에 안 됐고, 이 체크포인트로 LIBERO-Spatial을 평가하면 성공률 **0%**(0/20)가 나왔다. 여기서 중요한 건 원인 규명이다 — action normalization 통계(norm stats)를 직접 점검해 정상임을 확인했으므로 **버그가 아니라 순수한 undertrain**이다.
+
+그래서 **더 길게 다시 돌렸다**: `openvla-7b` 베이스 위에 LoRA(r=32, effective batch 16, image-aug)로 **4000 step ≈ 1.2 epoch**, 단일 4090에서 ~28시간. 학습 종료 시 token action-accuracy ~0.37 / loss ~2.5로 **분명히 학습은 진행됐다**(0에서 우상향). 이 `ft_real` 체크포인트를 LIBERO-Spatial **100 에피소드**(10 태스크 × 10 trial)로 평가한 실측 성공률은 **4.0%(4/100)**:
+
+| run | 학습량 | eval | 성공률 |
+|---|---|---|---|
+| 첫 run | 1500 step ≈ 0.45 ep | 20-ep | **0%** (0/20) |
+| `ft_real` | 4000 step ≈ 1.2 ep | 100-ep | **4.0%** (4/100) |
+| 공식 체크포인트(참고) | 대규모 학습 | — | ~84% (논문) |
+
+태스크별로 보면 10개 중 3개에서만 성공이 나왔고(최고 20%) 나머지 7개는 0%였다. 즉 **더 오래 학습하니 0%→4%로 바늘이 움직이긴 했지만**(방향은 옳다), 논문/공식 체크포인트 수준(~84%)과는 여전히 자릿수가 다르다. 0.45→1.2 epoch로도 이 정도이니, 수렴에는 훨씬 더 많은 epoch(compute)가 필요하다는 걸 두 데이터 포인트로 직접 확인한 셈이다.
 
 과정에서 얻은 교훈 하나: 처음엔 wandb를 꺼두고 돌리는 바람에 **loss 곡선을 전혀 남기지 못했다.** 이후 `finetune.py`에 `[metrics]` 태그로 step/loss를 직접 print하도록 패치해서, 외부 로깅 없이도 학습 진행 상황을 콘솔에서 확인할 수 있게 고쳤다.
 
@@ -89,7 +99,7 @@ LIBERO 씬을 넘어, **우리가 MuJoCo에서 직접 만든 매니퓰레이션 
 
 - **VLA는 스택 전체를 대체한다**: L1/L2는 "인지 → 우리 IK/제어"였지만 OpenVLA는 인지·IK·grasp 계획 없이 이미지+문장에서 action을 바로 낸다. 컨텍스트 전달 사다리 L1(포인터) → L2(언어 grounding) → **L3**(VLA)가 이걸로 완성된다.
 - **캐비엇 (1)**: 위 결과는 OpenVLA의 **자기 벤치(LIBERO) + 공식 파인튜닝 체크포인트** 결과지, 우리 MuJoCo 커스텀 씬이 아니다 — VLA는 학습된 embodiment/action-space 안에서만 유효하다.
-- **캐비엇 (2)**: 체크포인트를 실행해 논문값을 재현하는 것과 VLA를 처음부터 훈련시키는 것은 다르다. 후자를 직접 시도해본 결과가 위의 "0.45 epoch → 0%" 정직한 undertrain 사례다.
+- **캐비엇 (2)**: 체크포인트를 실행해 논문값을 재현하는 것과 VLA를 처음부터 훈련시키는 것은 다르다. 후자를 직접 시도해본 결과가 위의 "0.45 ep → 0% → 1.2 ep → 4%" 정직한 undertrain 진행 사례다 — 학습은 되지만 수렴엔 훨씬 더 많은 compute가 필요하다.
 - **캐비엇 (3, 4)**: 20-ep는 논문 full-eval(500-ep)의 부분집합이고, 어디까지나 시뮬레이션이며 실사 로봇은 아니다.
 - **다음 축**: 다른 suite(object/goal/long) 간 실패 양상 비교, Octo 같은 경량 모델과의 직접 대조, [grasp_sota.md](grasp_sota.md)의 grasp SOTA A/B와 묶어 "인지형 grasp vs end-to-end VLA 정책" 관점으로 연결. VLA와 world-model 기반 RL 계열의 패러다임 차이는 [concepts.md](concepts.md) 참고.
 
