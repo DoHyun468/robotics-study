@@ -5,6 +5,9 @@ parts:
     chapters:
       - file: perception
       - file: manipulation
+  - caption: SLAM · Localization & Mapping
+    chapters:
+      - file: slam
   - caption: Learned Grasping & Policies
     chapters:
       - file: grasp_sota
