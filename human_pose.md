@@ -155,7 +155,31 @@ HM0(몸 22관절)에서 **양손 30관절까지 함께** 최적화하고, JD가 
 
 *정직: 시뮬 clean 멀티뷰에선 접촉항이 불필요(재투영으로 충분). 접촉 prior의 결정적 값은 **실제 노이즈 있는 단안/가림** 상황(HM6)이며, 여기선 그 메커니즘을 단안 depth 모호성으로 재현했다.*
 
-## 8. 데이터셋 (실데이터는 HM6)
+## 8. HM3 — Egocentric vs Exocentric: 손엔 근접 카메라가 정공법
+
+HM1·HM2에서 **손은 몸/원거리(exocentric) 카메라에서 약하게 제약**됨을 봤다(수십 px). HM3는 그 해법을 정량화한다: **머리장착(egocentric) 근접 카메라**는 손이 프레임을 가득 채워, 같은 2D 검출 노이즈가 훨씬 작은 3D 오차로 매핑된다.
+
+<img src="_static/hm3_ego_vs_exo.png" alt="egocentric vs exocentric hand view" style="width:100%;max-width:1100px;border-radius:8px">
+
+*같은 해상도·같은 손인데 — 원거리 exo(좌)에선 손이 45px 티끌, 근접 ego(우)에선 327px로 프레임을 채운다(7×).*
+
+| 카메라 구성 | 손 MPJPE | 비고 |
+|---|---|---|
+| 1× exo (far ~1.8m) | 111.2mm | 손 45px, 단안 |
+| 1× ego (close ~0.3m) | 72.2mm | 손 327px — 근접이 단안 exo보다 나음 |
+| **2× ego (stereo 7cm)** | **6.2mm** | 근접 스테레오 → metric depth (Quest/Aria류) |
+| 4× exo (far) | 2.1mm | 원거리라도 멀티뷰면 해결 |
+| ego + 3× exo | 3.0mm | 융합 |
+| 1× ego, **가림 40%** | 77.3mm | 단일뷰는 자기가림에 취약 |
+| **ego + 3× exo, 가림 40%** | **3.9mm** | 융합이 가림 보완 |
+
+**핵심:**
+1. **근접(ego)이 원거리(exo) 단안보다 낫다**(72 vs 111mm) — 손이 7× 크게 잡혀 2D가 정밀.
+2. **단일 뷰는 어떤 것이든 depth 모호**(72–111mm) → mm 정확도엔 멀티카메라 필요.
+3. **Ego 스테레오가 metric depth를 준다**(6.2mm) — 실제 헤드셋(Quest·Aria·[HOT3D](https://facebookresearch.github.io/hot3d/))이 근접 스테레오 카메라를 쓰는 이유.
+4. **ego+exo 융합은 가림에 강건**(가림 40%에서 단일 ego 77mm → ego+3exo 3.9mm) — 한 뷰에서 가려진 손가락을 다른 뷰가 채운다.
+
+## 9. 데이터셋 (실데이터는 HM6)
 
 HM0·HM1은 **시뮬레이션**이다 — GT SMPL을 샘플링해 렌더하고, 그 관측으로 복원한다(GT를 알기에 오차를 mm로 잴 수 있음). **실제 데이터셋 검증은 HM6**에서 하며, 그때 해당 데이터셋의 실제 프레임(우리가 돌린 결과)을 올린다. 계획 데이터셋:
 
