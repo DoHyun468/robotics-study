@@ -138,6 +138,30 @@ NeRF를 **진짜 3D Gaussian Splatting**으로 업그레이드했다. gaussian�
 - **3DGS가 NeRF보다 ~8 dB 높고 ~6× 빠르다** — 렌더가 거의 photorealistic(물체 모서리·그림자·바닥·스카이까지 선명). RGB-D init + gsplat rasterizer의 효율.
 - **핵심(SLAM 연결):** GT vs S3 pose 격차가 3DGS에선 **~5.1 dB**(33.1 vs 28.0)로 NeRF의 ~1.6 dB보다 크다. 선명한 gaussian은 pose 오차(S3 잔여 drift 40 mm)에 더 민감 → **정확한 SLAM pose가 뉴럴 맵 품질에 더 결정적**임을 정량 확인. 오도메트리(S1) → 백엔드(S3) → 뉴럴 맵(S4/S4b)이 한 줄로 이어진다. *한계(정직): densification/배경 gaussian·tracking 미구현 — SplaTAM식 joint tracking+3DGS가 다음.*
 
+### S5 — 차량/주행 SLAM: 전방주시 폐루프 (다른 체제)
+
+지금까지의 S0–S4는 **테이블탑을 도는 inward-looking orbit**(물체 중심, 회전 지배)이다. 이와 **근본적으로 다른 체제** — **전방을 보며 전진하는 카메라(ego-motion)** 가 거리 씬의 폐루프를 주행하는 KITTI/자율주행 setting — 을 새로 만들어 같은 파이프라인(VO→pose-graph)을 돌렸다.
+
+<img src="_static/slam_drive_preview.gif" alt="driving forward-facing street view" style="width:100%;max-width:820px;border-radius:8px">
+<img src="_static/slam_drive_pg.png" alt="driving pose-graph before/after vs GT" style="width:100%;max-width:820px;border-radius:8px">
+
+| | orbit (S0) | driving (S5) |
+|---|---|---|
+| 시선 | 고정 중심(inward) | 진행 방향(forward) |
+| 경로 | 7.9 m | 29.3 m |
+| VO RPE Δ1 | ~3 mm | 28.6 mm |
+| VO ATE (ORB+PnP) | 63.6 mm | 584.8 mm |
+
+**전진 주행 VO는 훨씬 어렵다** — forward-motion degeneracy(focus-of-expansion 근처 점은 거의 안 움직임) + 성긴 원거리 특징(인라이어 67 vs orbit 378/frame). pose-graph는 씬 스케일에 맞춰 loop-closure gate를 넓히자 **loop closure 9개**(복귀 시)로 **ATE 584.8 → 292.3 mm (50% 감소)**. odometry(파랑)는 루프를 못 닫고 바깥으로 drift → loop closure(주황)가 닫는다 — 실제 자율주행 SLAM의 핵심을 재현. 같은 파이프라인이 **object-centric orbit과 ego-motion driving 두 체제 모두**에서 동작(특정 시나리오 과적합 아님).
+
+### S6 — SplaTAM식 tracking: 3DGS 맵에 카메라 localization
+
+S4b 3DGS는 mapping까지였다. 뉴럴 SLAM의 나머지 절반 **tracking**을 더한다: **고정된 3DGS 맵에 대해 perturb된 초기 pose에서 렌더링 photometric error를 gradient로 최소화해 카메라 pose를 복원**한다(SplaTAM tracking).
+
+<img src="_static/slam_track.png" alt="3DGS camera tracking before/after + render alignment" style="width:100%;max-width:820px;border-radius:8px">
+
+held-out 프레임을 (4°, 40 mm) perturb한 뒤 tracking하면 **1.1 mm / 0.03°** 로 복원(성공률 **100%**, <10 mm & <1°). 관측 이미지와 tracked-pose 3DGS 렌더가 거의 동일하다. → **mapping(S4b) + tracking(S6) = 완전한 뉴럴 SLAM 루프의 두 축**을 GT로 검증.
+
 ---
 
-*§1–6은 SLAM 개념·논문의 정성적 정리(문헌)이고, §7은 이 프로젝트에서 MuJoCo GT로 직접 측정한 실측 결과(S0–S4 전 단계 완료)다.*
+*§1–6은 SLAM 개념·논문의 정성적 정리(문헌)이고, §7은 이 프로젝트에서 MuJoCo GT로 직접 측정한 실측 결과다: **S0 시퀀스 → S1 VO → S2 TSDF → S3 pose-graph → S4/S4b 뉴럴 맵(NeRF/3DGS) → S5 차량 SLAM → S6 3DGS tracking.** 전 단계 GT 정량 벤치마크.*
