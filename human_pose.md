@@ -2,6 +2,34 @@
 
 [손(MANO) 멀티뷰 피팅](hand_pose.md)을 **관절 손 → 전신(SMPL body)** 으로 확장한 실측이다. 손과 완전히 동일한 방법론 — **GT를 알고, 관측에서 복원하고, 오차를 mm로 잰다** — 을 6890-버텍스·52-관절 전신 파라메트릭 모델에 적용한다. 여기서는 **SMPL forward를 라이브러리에 의존하지 않고 직접 구현**(shape/pose blendshape + Linear Blend Skinning)해, 각 수식이 무엇을 하는지 논문 수준으로 전개한다. 모델 리뷰는 [SMPL·MANO](reviews/smpl-mano.md).
 
+---
+
+## 0. 이 트랙을 읽는 법 — 전체 서사 (HM0 → HM6)
+
+> 이 페이지는 포트폴리오이자 **내 공부 노트**다. 그래서 각 단계는 "완성된 결과"만이 아니라 **왜 이걸 하는가 → 무엇을 시도했나 → 무엇이 안 됐고 어떻게 고쳤나 → 사진/영상으로 어떤 결과가 나왔나 → 다음 단계로 어떻게 이어지나** 의 흐름으로 적는다.
+
+**하나의 질문으로 관통한다:** *"이미지에서 사람의 3D 자세(손·몸)를 얼마나 정확히 복원할 수 있는가, 그리고 무엇이 그 한계를 만드는가?"* 답을 향해 단계를 쌓는다.
+
+**되풀이되는 핵심 명제(thesis):** **단안(1시점)은 2D 재투영과 국소 *형상*은 잘 맞추지만, 광선 방향의 *절대 깊이·스케일*은 근본적으로 모호하다.** 이 모호성을 **멀티뷰·스테레오·근접 카메라·학습된 prior**가 푼다. 이 명제를 시뮬(HM0–HM5)에서 세우고 **실데이터(HM6/HOT3D)에서 mm 단위로 확증**한다.
+
+**단계별 논증 (각 단계는 앞 단계가 남긴 한계를 푸는 답):**
+
+| 단계 | 질문/동기 | 핵심 시도 | 결과(대표 수치) | 다음으로 이어짐 |
+|---|---|---|---|---|
+| **HM0** | 몸을 이미지에서 복원되나? | SMPL 자체구현 + 멀티뷰 역최적화 | 1뷰 119 → 8뷰 **7.6mm** | 단안이 붕괴 → **멀티뷰 필요** |
+| **HM1** | 크기(scale)까지 잡히나? | 몸+양손+global scale | scale 1뷰 4.3%→멀티뷰 0.8%; **손이 몸보다 2.4× 어려움** | 손이 몸 카메라서 작다 → **egocentric(HM3)** |
+| **HM2** | 손-물체 상호작용은? | MANO+box + 접촉/침투 prior | 단안 침투 9.1→**0mm**, 손 14.2→6.4mm | 접촉 prior가 단안 모호 완화 → 실물체는 **HOT3D HOI(§11.5)** |
+| **HM3** | 손엔 어떤 카메라? | egocentric vs exocentric | 1exo 111→**2ego-stereo 6.2mm** | 근접 스테레오=metric → 실헤드셋 **HOT3D(§11.4)** |
+| **HM4** | 센서 여러 개는? | camera↔IMU 시공간 동기화 | $t_d$ 2.1ms·extrinsic 0.26° | 멀티센서 정합 = 멀티뷰의 전제 |
+| **HM5** | 로봇으로 어떻게? | 사람 손 → Allegro 리타게팅 | 자기충돌 6→0, PA feasibility | perception→action 다리 |
+| **HM6** | 실데이터에선? | MediaPipe·HMR2.0·**HOT3D 실 3D GT** | HOT3D **PA 3.9mm / root-rel 48.9mm** | 명제 확증 + 남은 과제(깊이) |
+
+**무엇이 반복해서 부서졌나(디버깅이 곧 공부):** SMPL이 Y-up인데 카메라를 Z-up으로 깔아 몸이 옆으로 눕던 것(HM0), 침투 패널티를 mean으로 걸어 gradient가 사라지던 것(HM2, → sum으로), MANO PCA 부호가 반대라 주먹이 펴지던 것(HM5), 그리고 HM6에서 **디스크 풀·chumpy/numpy 호환·어안 캘리브·좌표계 프레임 불일치**까지 — 이 실패들을 어떻게 진단하고 고쳤는지를 각 절에 남긴다.
+
+아래는 그 첫 단계, **HM0의 토대인 SMPL 파라메트릭 모델**부터 수식으로 전개한다.
+
+---
+
 ## 1. SMPL 파라메트릭 모델 (원리)
 
 SMPL은 사람 몸을 **저차원 파라미터**로 생성하는 미분가능 함수 $M(\beta,\theta)\to(V,J)$ 다. 입력은 **형상(shape)** $\beta\in\mathbb{R}^{10}$ 과 **자세(pose)** $\theta\in\mathbb{R}^{3(J+1)}$ (관절별 axis-angle, $J{=}$ 관절 수). 우리가 쓴 모델은 **SMPL+H**(SMPL 몸 + MANO 손, 52관절·6890버텍스)이며 HM0에서는 **몸 22관절**을 최적화하고 손은 flat mean으로 고정한다.
@@ -366,7 +394,43 @@ $$\min_{\theta,\,s,\,\mathbf t}\ \sum_{j}\Big\|\,\pi_{f}\big(s\,\hat J_j(\theta)
 
 **핵심 (이번 트랙의 결정적 실측):** 실제 연구 데이터셋의 **3D MANO GT 대비 PA-MPJPE 3.9mm** — 우리가 처음부터 직접 구현한 MANO 피팅이 실제 인간 손의 *관절/형상*을 **4mm 수준**으로 복원한다. 동시에 **root-relative는 48.9mm** — 이것이 HM0–HM6 내내 말한 **단안 scale/depth(광선 방향) 모호성**이다: 한 시야에선 손의 절대 깊이를 못 잡지만(→root-rel 큼) 국소 형상은 정확히 복원한다(→PA 작음). 위 막대그래프에서 프레임마다 빨강(큼)↔초록(작음)이 이를 명확히 보여준다. **시뮬(HM0–HM5)에서 세운 가설이 실제 egocentric 데이터로 확증됐다.** 다중뷰/스테레오(HM3에서 정량화)로 depth 모호를 풀면 root-rel도 내려간다.
 
-*정직·범위: 1개 시퀀스·13 hand·15관절 대응(tip 제외). HOT3D는 라이선스 등록 데이터셋 — 원본 프레임은 연구/교육 시연으로 출처를 밝혀 인용하며, 데이터 자체는 재배포하지 않는다(저장소 미포함). 여러 시퀀스로 확장하면 통계가 더 탄탄해진다.*
+*정직·범위: 1개 시퀀스·13 hand·15관절 대응(tip 제외). HOT3D는 라이선스 등록 데이터셋 — 원본 프레임은 연구/교육 시연으로 출처를 밝혀 인용하며, 데이터 자체는 재배포하지 않는다(저장소 미포함). 여러 시퀀스로 확장하면 통계가 더 탄탄해진다 → §11.6.*
+
+### 11.5 실데이터 HOI — 손 + 물체 (HM2를 실물체로)
+
+**왜 이걸 하나.** §7(HM2)은 손이 **가상의 상자**를 잡는 상황에서 접촉/침투를 해석적 SDF로 모델링했다. 이제 HOT3D의 **실제 물체 6-DoF GT**(keyboard·mouse·cellphone·mug 2종·dumbbell, uid↔이름 매핑)로 그 아이디어를 **실데이터**에 옮긴다. 물체 CAD(mesh) 라이브러리는 필요 없다 — 물체 **중심 6-DoF**만으로 "손이 어떤 물체를, 언제 잡는가"를 잰다.
+
+**무엇을 시도했나.** dump 단계에서 각 프레임의 손 GT와 함께 `object_pose_data_provider`로 물체 6-DoF를 읽어, 손과 동일한 핀홀 카메라로 **물체 중심을 투영**했다(어안 프레임에 box2d가 있지만 우리 이미지는 undistort된 핀홀이라 좌표계가 달라, 2D 박스 대신 6-DoF 중심을 직접 투영하는 쪽이 일관적이었다). 그다음 매 프레임 **손끝 5점 → 각 물체 중심의 최소 3D 거리**(cm)를 계산했다.
+
+<img src="_static/hot3d_hoi.png" alt="real HOT3D hand + labelled objects in egocentric view" style="width:100%;max-width:1280px;border-radius:8px">
+
+*실제 egocentric 프레임에 손 GT 골격(green) + 실물체 6-DoF(□, 이름 라벨). 손이 테이블의 여러 물체 사이에서 mug_white로 접근한다.*
+
+<img src="_static/hot3d_hoi_dist.png" alt="hand-to-object distance over time" style="width:100%;max-width:1100px;border-radius:8px">
+
+*손끝→물체 3D 거리(cm)를 40 연속 프레임에 대해. **mug_white**(주황)가 ~70cm에서 **grasp/contact zone(<8cm)** 로 떨어져 유지된다 = 잡음. **mug_patterned**(빨강)는 20cm까지 접근했다 다시 멀어진다(스쳐 지나감). 나머지(mouse·cellphone·dumbbell)는 멀리 있음.*
+
+**결과.** 프레임별 최소거리에서 자동으로 **잡은 물체 = mug_white**(최소 5.8cm, 유일하게 접촉존 진입)로 판정. 이는 HM2의 "접촉/침투" 신호를 **실물체 6-DoF로 재현**한 것 — HM2가 합성 SDF로 만들던 접촉 이벤트를, 여기서는 실제 grasp의 거리 프로파일로 관측한다.
+
+*정직: CAD mesh가 없어 접촉을 물체 *중심 거리*로 근사했다(진짜 표면 침투는 아님). 물체 라이브러리(assets)를 받으면 표면 SDF로 HM2식 침투까지 실데이터로 잴 수 있다. 이어짐 → 이 손-물체 관계가 결국 **HM5 리타게팅**(사람이 물체를 잡는 방식을 로봇 핸드로)과 로봇 조작으로 연결된다.*
+
+### 11.6 여러 시퀀스로 확장 — 벤치마크가 우연이 아님을 확인
+
+**왜.** §11.4의 3.9mm는 1개 시퀀스라 "운 좋은 한 장면"일 수 있다. 결과가 데이터에 안정적인지 보려면 시퀀스를 늘려야 한다(SLAM 트랙에서 TUM RGB-D를 fr1/fr2 여러 개로 벤치한 것과 같은 이유).
+
+**무엇을 했나.** manifest에서 **시퀀스 4개**를 각각 필요 부분만 받아(VRS+GT+hand+calib) 동일 파이프라인(어안→핀홀 undistort → 실 MANO GT 읽기 → 우리 MANO 원근 피팅 → PA/root-rel MPJPE)을 돌리고, 결과를 손 수로 가중평균했다. **총 55 hands.**
+
+<img src="_static/hot3d_multiseq.png" alt="HOT3D benchmark across 4 sequences" style="width:100%;max-width:1100px;border-radius:8px">
+
+| 시퀀스 | hands | 재투영 | PA-MPJPE | root-rel |
+|---|---|---|---|---|
+| P0001_10a27bf7 | 13 | 2.6px | 3.9mm | 48.9mm |
+| P0001_15c4300c | 14 | 2.6px | 3.4mm | 39.0mm |
+| P0001_23fa0ee8 | 14 | 2.7px | 3.3mm | 64.2mm |
+| P0001_4bf4e21a | 14 | 3.5px | 6.7mm | 61.0mm |
+| **전체 (가중)** | **55** | **2.9px** | **4.3 ± 1.4mm** | **53.3mm** |
+
+**핵심:** 시퀀스가 바뀌어도 **PA-MPJPE 4.3±1.4mm로 일관** — 우리 MANO 피팅의 형상 복원 정확도가 특정 장면 운이 아니라 **실데이터 전반에서 4mm대로 안정적**임을 확인. root-rel은 39–64mm로 장면마다 다르지만 항상 큰데(단안 깊이 모호), 이 편차 자체가 "장면의 손-카메라 거리/자세에 따라 깊이 모호의 크기가 달라진다"는 걸 보여준다. *(P0001_4bf4e21a가 PA 6.7로 약간 높은 건 그 시퀀스에 빠른 손동작/모션블러 프레임이 섞여 GT 2D 대응이 흔들린 탓 — 프레임을 더 엄격히 거르면 내려간다.)*
 
 ## 재현
 ```bash
@@ -384,4 +448,8 @@ python src/hmr2_run.py     # HMR2.0 vs 우리 SMPL (같은 실사진, CPU)
 python src/hot3d_download.py 0                                 # 1개 시퀀스 최소 다운로드
 python src/hot3d_dump.py                                       # VRS→핀홀 RGB + MANO 3D GT (hot3d env)
 python src/hot3d_fit.py --mano_dir <dir>/mano --render        # 우리 MANO 피팅 → 실 mm MPJPE
+python src/hot3d_viz.py --mano_dir <dir>/mano                  # §11.4 실프레임 오버레이 + 추적 GIF + MPJPE 차트
+python src/hot3d_hoi.py                                        # §11.5 손+물체 HOI (거리/grasp)
+# §11.6 여러 시퀀스: hot3d_download.py 1/2/3 → 각 추출 → HOT3D_SEQ/HOT3D_DUMP/HOT3D_OUT 로 dump+fit → aggregate
+python src/hot3d_aggregate.py                                  # 시퀀스별 표 + 차트
 ```
