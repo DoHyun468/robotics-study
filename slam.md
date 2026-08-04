@@ -176,28 +176,28 @@ held-out 프레임을 (4°, 40 mm) perturb한 뒤 tracking하면 **1.1 mm / 0.03
 | **pose-graph (loop closure 200)** | **17.0 mm (−62%)** |
 | static baseline | 185.8 mm |
 
-**시뮬에서 개발한 파이프라인이 실제 Kinect 데이터로 그대로 전이** — VO ~4.3 cm, loop closure 후 **1.7 cm**. 참고로 공개 RGB-D SLAM(ORB-SLAM2, full BA+loop)이 fr1_xyz에서 ~1 cm 수준이니, **BA·landmark 없는 pose-graph-only로 1.7 cm는 정직하게 경쟁력 있는 실측 결과**다. 실측이라 depth 노이즈·구멍으로 sim보다 어렵고(RPE Δ1 4.9 vs sim 2.5 mm), loop closure가 실데이터 drift를 62% 접는다. *엔지니어링 메모: fr1_xyz가 작은 볼륨을 반복 스캔해 loop 후보가 폭증 → detect_loops를 프레임당 최근접 top-k만 검증하도록 bound(O(n·k))해 tractable하게 만들었다.*
+**시뮬에서 개발한 파이프라인이 실제 Kinect 데이터로 그대로 전이** — VO ~4.3 cm, loop closure 후 **1.7 cm**. 참고로 공개 RGB-D SLAM(ORB-SLAM2, full BA+loop)이 fr1_xyz에서 ~1 cm 수준이니, **BA·landmark 없는 pose-graph-only로 1.7 cm는 정직하게 경쟁력 있는 실측 결과**다.
+
+#### 다중 시퀀스 벤치마크 (SLAM 논문 스타일 표)
+여러 표준 시퀀스에 같은 파이프라인을 돌려 ATE를 정리했다:
+
+<img src="_static/slam_tum_benchmark.png" alt="TUM RGB-D ATE benchmark across sequences" style="width:100%;max-width:820px;border-radius:8px">
+
+| 시퀀스 | 경로 | VO-ICP | VO-ORB+PnP | pose-graph | loops |
+|---|---|---|---|---|---|
+| fr1/xyz | 8.0 m | 43.2 | 45.3 | **17.0** | 200 |
+| fr1/desk | 9.3 m | 571.9 | 76.5 | **37.5** | 78 |
+| fr1/room | 16.0 m | 186.6 | 309.8 | 298.2 | 35 |
+| fr2/desk | 18.2 m | 1098.0 | 665.3 | 664.8 | 1 |
+
+**정직한 동작 범위(operating envelope):** 데스크 스케일·느린 병진(fr1/xyz·desk)에선 pose-graph 후 **1.7–3.8 cm**로 좋다. 더 크고 빠른 시퀀스(fr1/room·fr2/desk)에선 **단순 2-프레임 VO의 drift가 커지고 유효 loop closure가 적어**(fr2/desk는 단 1개) 정확도가 떨어진다 — 이는 **keyframe·full bundle adjustment·robust place recognition(BoW)** 을 갖춘 ORB-SLAM류가 필요한 이유를 정확히 보여준다. 어느 시퀀스든 VO는 static baseline을 크게 이긴다. 방법별 강점도 드러난다: 회전 많은 fr1/desk는 ICP가 무너지고 특징기반 PnP가 강하며, 그 반대 경우도 있다.
+
+*엔지니어링 메모: fr1_xyz가 작은 볼륨을 반복 스캔해 loop 후보가 폭증 → `detect_loops`를 프레임당 최근접 top-k만 검증하도록 bound(O(n·k))·씬 스케일별 `loop_dist` 튜닝. fr2는 fr1과 intrinsic이 달라 카메라별 K를 반영.*
 
 ---
 
-*§1–6은 SLAM 개념·논문의 정성적 정리(문헌)이고, §7은 이 프로젝트에서 직접 측정한 실측 결과다: **S0 시퀀스 → S1 VO → S2 TSDF → S3 pose-graph → S4/S4b 뉴럴 맵(NeRF/3DGS) → S5 차량 SLAM → S6 3DGS tracking**(전부 MuJoCo GT), 그리고 **S7 실데이터(TUM RGB-D) 벤치마크**. 시뮬 GT와 실데이터 표준 벤치마크 양쪽에서 검증. 각 단계에 쓴 수식은 아래 §8.*
+*§1–6은 SLAM 개념·논문의 정성적 정리(문헌)이고, §7은 이 프로젝트에서 직접 측정한 실측 결과다: **S0 시퀀스 → S1 VO → S2 TSDF → S3 pose-graph → S4/S4b 뉴럴 맵(NeRF/3DGS) → S5 차량 SLAM → S6 3DGS tracking**(전부 MuJoCo GT), 그리고 **S7 실데이터(TUM RGB-D) 벤치마크**. 시뮬 GT와 실데이터 표준 벤치마크 양쪽에서 검증.*
 
-## 8. 수식·기술 부록 (S0→S6에서 실제로 쓴 것)
+## 8. 수식·유도
 
-각 단계에서 구현·사용한 행렬과 공식. 기호: $R\in SO(3)$ 회전, $t\in\mathbb{R}^3$ 병진, $T=\begin{bmatrix}R&t\\0&1\end{bmatrix}\in SE(3)$. 카메라 규약 OpenCV(x 오른쪽, y 아래, z 전방).
-
-**공통 기하 (S0).** Intrinsics는 세로 화각 $\text{fovy}$·높이 $H$에서 $f=\dfrac{H/2}{\tan(\text{fovy}/2)}$, $K=\begin{bmatrix}f&0&c_x\\0&f&c_y\\0&0&1\end{bmatrix}$. Back-projection(2D+depth→3D)은 $X_c=z\,K^{-1}[u,v,1]^\top=\big(\tfrac{(u-c_x)z}{f_x},\tfrac{(v-c_y)z}{f_y},z\big)$, 월드로 $X_w=R_{wc}X_c+t_{wc}$. 투영은 $\pi(X_c)=\big(f_x\tfrac XZ+c_x,\,f_y\tfrac YZ+c_y\big)$.
-
-**S1 시각 오도메트리.** *Point-to-plane ICP*: $\min_{R,t}\sum_i\big((Rp_i+t-q_i)\cdot n_i\big)^2$를 소각 근사($R\approx I+[\omega]_\times$)로 선형화 → $6\times6$ 정규방정식 $Ax=b$, $x=[\omega;t]$, $G_i=[p_i\times n_i\ \ n_i]$, $r_i=(p_i-q_i)\!\cdot\!n_i$, $A=\sum G_i^\top G_i$, $b=-\sum G_i^\top r_i$. *ORB+PnP*: 재투영오차 $\min\sum\|\pi(RX_i+t)-u_i\|^2$ (RANSAC). 궤적 적분 $T_{wc}^{(i+1)}=T_{wc}^{(i)}M$. 평가 *ATE*=Umeyama 정렬 후 위치 RMSE, *RPE*=$\big(T^g_i{}^{-1}T^g_{i+\Delta}\big)^{-1}\big(T^e_i{}^{-1}T^e_{i+\Delta}\big)$.
-
-**S2 TSDF.** voxel에 절단 부호거리 $\Psi(d)=\max(-1,\min(1,d/\tau))$를 가중 이동평균 $D\leftarrow\frac{WD+w\Psi}{W+w}$로 융합, 표면=영교차(marching cubes). 품질=대칭 Chamfer.
-
-**S3 pose-graph.** 지수사상 $\xi=[\rho;\phi]$, $R=\exp([\phi]_\times)$ (Rodrigues), $t=V(\phi)\rho$, $V=I+\tfrac{1-\cos\theta}{\theta^2}[\phi]_\times+\tfrac{\theta-\sin\theta}{\theta^3}[\phi]_\times^2$. Adjoint $\mathrm{Ad}_T=\begin{bmatrix}R&[t]_\times R\\0&R\end{bmatrix}$. BetweenFactor 잔차 $e_{ij}=\log(Z_{ij}^{-1}T_i^{-1}T_j)$, 소각 Jacobian $\partial e/\partial\xi_i=-\mathrm{Ad}_{T_j^{-1}T_i}$, $\partial e/\partial\xi_j=I$. Gauss-Newton $H\delta=-g$($H=\sum J^\top WJ$)로 $T_k\leftarrow T_k\exp(\delta_k)$.
-
-**S4 NeRF.** 볼륨 렌더링 $\hat C=\sum_i T_i\alpha_i c_i$, $\alpha_i=1-e^{-\sigma_i\delta_i}$, $T_i=\prod_{j<i}(1-\alpha_j)$; positional encoding $\gamma(x)=[\,x,\sin(2^l\pi x),\cos(2^l\pi x)\,]_{l=0}^{L-1}$.
-
-**S4b 3DGS.** 장면=3D 가우시안 합, $G_i(x)=\exp(-\tfrac12(x-\mu_i)^\top\Sigma_i^{-1}(x-\mu_i))$, $\Sigma=RSS^\top R^\top$; 2D 투영(EWA) 후 깊이순 알파 합성 $C=\sum_i c_i\alpha_i\prod_{j<i}(1-\alpha_j)$.
-
-**S6 tracking.** 맵 고정, $T^\star=\arg\min_T\|\mathcal R(\text{map};T)-I_\text{obs}\|_1$. 등방 가우시안이라 means의 강체변환 $\hat R=\exp([\omega]_\times),\hat t$를 최적화. *PSNR*$=10\log_{10}(1/\text{MSE})$.
-
-*상세 유도·구현 노트: `robotics-lab/notes/slam_math.md` 및 단계별 노트.*
+각 단계에서 **실제로 구현·사용한 수식을 단계별로 완전히 유도**한 별도 수업 자료가 있다 → **[SLAM 수식·유도 (수업 자료)](slam_math.md)**. 핀홀 모델·역투영(fovy→K 유도 포함), point-to-plane ICP의 6-DoF 선형화 정규방정식 유도, PnP 재투영오차, Umeyama 정렬(SVD)·ATE/RPE, TSDF 가중 융합, **SE(3) exp/log·adjoint와 pose-graph BetweenFactor Jacobian의 우섭동 유도**, NeRF 볼륨 렌더링 적분의 이산화, 3DGS 공분산 $RSS^\top R^\top$·EWA 투영·알파합성, SplaTAM tracking의 means-변환 동치성까지 — 기호 정의·유도·해당 코드 위치를 모두 포함한다.

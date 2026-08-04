@@ -8,6 +8,7 @@ parts:
   - caption: SLAM · Localization & Mapping
     chapters:
       - file: slam
+      - file: slam_math
   - caption: Learned Grasping & Policies
     chapters:
       - file: grasp_sota
