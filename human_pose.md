@@ -199,7 +199,66 @@ $t_d$에 대한 **미분가능 선형보간**으로 gradient descent가 동기�
 
 **핵심:** 시간 오프셋을 **~2ms**, extrinsic 회전을 **0.26°** 로 복원. 노이즈에 단조 열화. **모션 excitation이 관측성의 열쇠** — 회전이 작으면(amp 0.15) 55ms/4.9°로 무너지고, 충분히 흔들면(amp 1.0) 2ms/0.26°. Kalibr가 "모든 축을 충분히 흔들라"고 요구하는 이유를 실측으로 확인. *정직: 각속도(gyro)로 $t_d$·회전 extrinsic까지. 완전한 spatial(translation lever-arm)엔 accelerometer가 추가로 필요(확장 가능).*
 
-## 10. 데이터셋 (실데이터는 HM6)
+## 10. HM5 — 사람 손 → 로봇 핸드 dexterous retargeting
+
+여기까지(HM0–HM4)는 **사람을 관측·복원**하는 perception이었다. HM5는 그 결과를 **로봇이 실행할 관절 명령으로 변환**한다 — JD의 "Human-to-Robot Motion Retargeting / 구조적 차이를 고려한 grasp pose 매핑 / 물리적 실현 가능성 검증 및 후처리(smoothing·interpolation·collision avoidance)". 대상 로봇은 **Allegro 4손가락 16-DoF 핸드**(MuJoCo Menagerie `wonik_allegro`), 소스는 **MANO 사람 손**(5손가락, ~21 DoF, 연조직).
+
+### 10.1 왜 관절각을 그대로 복사하면 안 되는가
+
+사람 손과 로봇 핸드는 **kinematic 구조가 다르다** — 손가락 수(5 vs 4), 링크 길이, 관절축, 가동범위, 그리고 사람의 연조직 변형. 사람 관절각 $\theta_\text{human}$ 을 로봇에 그대로 넣으면 **작업 공간(fingertip 위치)이 어긋난다**. 그래서 관절각이 아니라 **task-space 기하량(keyvector)** 을 맞춘다 — DexPilot / AnyTeleop(dex-retargeting)의 원리.
+
+### 10.2 Keyvector 정의
+
+손바닥(palm) 원점에서 각 손가락의 **중간 마디(medial)와 끝(distal)** 으로 향하는 벡터를 정의한다. 손가락 4개(검지 ff · 중지 mf · 약지 rf · 엄지 th) × 2마디 = **8개 keyvector**:
+
+$$v^{(h)}_i = p^{(h)}_i - p^{(h)}_\text{palm}\ \ (\text{사람}),\qquad v^{(r)}_i(q) = p^{(r)}_i(q) - p^{(r)}_\text{palm}(q)\ \ (\text{로봇, } q\text{의 함수})$$
+
+로봇 쪽 $p^{(r)}_i(q)$ 는 MuJoCo forward kinematics(`mj_forward`)로 얻는다. **중간+끝 두 마디**를 함께 잡는 게 중요하다 — 끝점만 맞추면 손가락이 "닿기만" 하고 **굽힘(curl)** 이 제약되지 않아 로봇이 덜 오므린다(실제로 처음 tip만 썼을 때 fist에서 안 접히는 버그를 겪음).
+
+### 10.3 프레임 정렬과 스케일
+
+사람 손과 로봇 손은 크기·기준 방향이 다르다. **스케일** 은 open 자세의 평균 keyvector 길이 비로,
+
+$$s = \frac{\frac{1}{8}\sum_i \|v^{(r)}_i(0)\|}{\frac{1}{8}\sum_i \|v^{(h)}_i\|}\ (\approx 0.93)$$
+
+**회전 정렬** $R$ 은 open 자세에서 두 keyvector 집합을 맞추는 **Kabsch(직교 Procrustes)** 해 — $H=\sum_i (s\,v^{(h)}_i)(v^{(r)}_i)^\top=U\Sigma V^\top$, $R=V\,\mathrm{diag}(1,1,\det(VU^\top))\,U^\top$ (반사 방지). 목표 keyvector는 $\;\tilde v_i = s\,R\,v^{(h)}_i$.
+
+### 10.4 경계 최적화 = 실현 가능성(feasibility) 내장
+
+로봇 관절각 $q\in\mathbb{R}^{16}$ 을 아래로 푼다 — **관절 한계를 bound로 넣어** 해가 항상 물리적으로 실행 가능:
+
+$$\min_{q}\ \sum_{i=1}^{8}\big\|\,v^{(r)}_i(q)-\tilde v_i\,\big\|^2 \;+\; \lambda_p\big\|(v^{(r)}_{th}-v^{(r)}_{ff})-(\tilde v_{th}-\tilde v_{ff})\big\|^2 \quad \text{s.t.}\quad q_\text{lo}\le q\le q_\text{hi}$$
+
+둘째 항은 **엄지–검지 pinch**(집기)를 강조하는 상대벡터 항($\lambda_p=1.5$). **L-BFGS-B**(bound-constrained)로 풀며, 시간 축에서는 이전 프레임 해로 **warm-start** 해 궤적 일관성을 준다. bound 덕분에 **joints within limits = 100%** 가 설계상 보장된다.
+
+### 10.5 Self-collision 회피 (후처리 ①)
+
+사람이 주먹을 꽉 쥐면 로봇 손가락끼리 **파고든다(interpenetration)**. 순수 retargeting은 24프레임 중 **6프레임이 자기충돌**했다. MuJoCo 접촉으로 최대 침투깊이 $d_\text{pen}(q)=\max(0,\,-\min_c \text{dist}_c)$ 를 읽어 **패널티**로 넣는다:
+
+$$\min_q\ \big[\text{(위 식)}\big] + w_\text{col}\,d_\text{pen}(q)^2,\qquad w_\text{col}=400$$
+
+결과: 자기충돌 **6/24 → 0/24**, 그러면서 keyvector 정확도는 **58.6 → 58.7mm** 로 거의 그대로(0.1mm 손해) — 충돌 회피가 사실상 공짜.
+
+### 10.6 Smoothing·Interpolation (후처리 ②③)
+
+- **Smoothing:** 관절 궤적에 폭 5 이동평균(경계는 edge-pad로 ringing 방지). jerk $\frac{1}{T}\sum_t|\,q_{t+1}-3q_t+3q_{t-1}-q_{t-2}|$ 가 **0.045 → 0.009 (5×↓)** — 실행 시 급가속 억제.
+- **Interpolation:** 24프레임을 **2× 업샘플(48)** 선형보간해 매끄러운 실행 궤적으로. 보간 후에도 자기충돌 **0/48** 유지.
+
+<img src="_static/hm5_retarget.png" alt="MANO human grasp retargeted to Allegro dexterous hand" style="width:100%;max-width:1200px;border-radius:8px">
+
+*위=사람 MANO 손(open→쥠→fist). 아래=리타게팅된 Allegro 핸드 — 손가락이 사람을 따라 오므라든다. 사람 5손가락이 로봇 4손가락으로 매핑되며(약지↔로봇 약지, 새끼는 생략), 엄지 대향(opposition)이 로봇 엄지로 근사된다.*
+
+| 항목 | 값 |
+|---|---|
+| human→robot 스케일 $s$ | 0.93 |
+| keyvector 매칭 (raw → collision-safe) | 58.6 → **58.7 mm** |
+| joints within limits | **100%** (bound 내장) |
+| self-collision 프레임 | 6/24 → **0/24** → 0/48(보간 후) |
+| jerk (smoothing) | 0.045 → **0.009** |
+
+**핵심:** 8개 keyvector 매칭 + Kabsch 정렬 + bound 최적화로 **관절 한계·자기충돌을 모두 만족하는 실행 가능한 grasp 궤적**을 만들고, smoothing·interpolation까지 붙였다. *정직: 잔차 ~58mm는 **cross-morphology 구조 차이**(사람 5손가락↔로봇 4손가락, 엄지 대향 구조가 특히 다름)에서 오는 근본 한계로, 완벽히 0이 될 수 없다 — 그래서 절대 위치가 아닌 keyvector(상대 기하)를 맞춘다. 실로봇 배포엔 (a) 팔 IK를 붙여 손목 6-DoF 궤적까지, (b) 접촉면 mesh 기반 충돌, (c) 힘/토크 feasibility를 추가한다(확장 가능).*
+
+## 11. 데이터셋 (실데이터는 HM6)
 
 HM0·HM1은 **시뮬레이션**이다 — GT SMPL을 샘플링해 렌더하고, 그 관측으로 복원한다(GT를 알기에 오차를 mm로 잴 수 있음). **실제 데이터셋 검증은 HM6**에서 하며, 그때 해당 데이터셋의 실제 프레임(우리가 돌린 결과)을 올린다. 계획 데이터셋:
 
@@ -214,4 +273,6 @@ HM0·HM1은 **시뮬레이션**이다 — GT SMPL을 샘플링해 렌더하고, 
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
 python src/hm_smpl_fit.py   --model <dir>/smplh/SMPLH_MALE.pkl --sweep --render   # HM0 body
 python src/hm1_wholebody.py --model <dir>/smplh/SMPLH_MALE.pkl --sweep --render   # HM1 whole-body+scale
+python src/hm4_calib_sync.py --render                                              # HM4 camera-IMU sync
+MUJOCO_GL=osmesa python src/hm5_retarget.py --mano_dir <dir>/mano --render        # HM5 MANO->Allegro retarget
 ```
