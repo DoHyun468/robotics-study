@@ -326,6 +326,28 @@ $$\min_{\theta,\,s,\,t}\ \sum_{j} w_j\Big\|\,s\,P_{xy}\big(\hat J_j(\theta)\big)
 
 *정직: HMR2.0은 남의 사전학습 모델이고 neutral SMPL(라이선스)이 필요하다. mm 단위 3D GT 벤치는 여전히 [HOT3D](https://facebookresearch.github.io/hot3d/)·3DPW/EMDB 같은 라이선스 데이터셋이 있어야 한다.*
 
+### 11.4 HOT3D — 실제 3D GT 대비 mm 벤치마크 (트랙의 결정판)
+
+HM6.1–6.3은 단안이라 **3D GT가 없어 정성**이었다. 여기서는 **[HOT3D](https://facebookresearch.github.io/hot3d/)**(Meta, **Project Aria 안경 egocentric**, 손+물체 조작, **MANO 3D 주석** 포함 — JD의 HOI·egocentric·MANO에 정확히 꽂히는 데이터셋)의 **실제 3D ground truth**에 우리 MANO 피팅을 붙여 **진짜 mm MPJPE**를 잰다.
+
+**파이프라인:** HOT3D Aria 시퀀스 1개를 받아 `projectaria_tools`/`hot3d` 툴킷으로 (a) **어안→핀홀 보정(undistort)** RGB 프레임, (b) **실제 MANO 3D 손 관절 GT**(카메라 프레임, metric), (c) 팩토리 카메라 캘리브를 읽는다. 손가락 마디 15점을 우리 MANO 16관절에 대응시키고, **실제 Aria 초점거리로 완전 원근(full-perspective) 단안 피팅**한다:
+
+$$\min_{\theta,\,s,\,\mathbf t}\ \sum_{j}\Big\|\,\pi_{f}\big(s\,\hat J_j(\theta)+\mathbf t\big)-x^{\text{GT2D}}_j\,\Big\|,\qquad \pi_f(P)=\Big(f\tfrac{P_x}{P_z}+c_x,\ f\tfrac{P_y}{P_z}+c_y\Big)$$
+
+복원한 3D 관절을 GT 3D와 두 방식으로 비교한다: **root-relative MPJPE**(손목 정렬, 깊이 모호 포함)와 **PA-MPJPE**(Procrustes 상사 정렬 — 전역 회전·스케일·깊이 제거, 손 *형상/관절* 자체의 정확도).
+
+<img src="_static/hot3d_fit.png" alt="HOT3D real 3D MANO GT vs our monocular MANO fit (skeleton, PA-aligned)" style="width:100%;max-width:1200px;border-radius:8px">
+
+*HOT3D **실제 3D MANO GT**(green) vs 우리 단안 MANO 피팅(orange) — Procrustes 정렬, mm 스케일. 손 관절이 거의 겹친다(PA ~3mm). (원본 Aria RGB 프레임은 데이터셋 라이선스상 공개 사이트엔 싣지 않음 — 로컬에서 재현 가능.)*
+
+| 지표 (13 real hands, 1 seq) | 값 |
+|---|---|
+| 재투영 오차 | **2.6 px** |
+| **PA-MPJPE** (형상·관절) | **3.9 mm** |
+| root-relative MPJPE (깊이 포함) | 48.9 mm |
+
+**핵심 (이번 트랙의 결정적 실측):** 실제 연구 데이터셋의 **3D MANO GT 대비 PA-MPJPE 3.9mm** — 우리 손 *관절/형상* 복원이 실측 4mm 수준으로 정확하다. 동시에 **root-relative는 48.9mm** — 이것이 바로 HM0–HM6 내내 말한 **단안 scale/depth(광선 방향) 모호성**이다: 한 시야에선 손의 절대 깊이를 못 잡지만(→root-rel 큼), 국소 형상은 정확히 복원한다(→PA 작음). *시뮬(HM0–HM5)에서 세운 가설이 실제 egocentric 데이터에서 그대로 확인됐다.* 정직: 1개 시퀀스·15관절 대응·손가락 tip은 제외(우리 MANO 16관절엔 tip 없음). 다중뷰/스테레오(HM3에서 정량화)로 depth 모호를 풀면 root-rel도 내려간다.
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -338,4 +360,8 @@ python src/hm6_detect.py         &&  python src/hm6_realfit.py --mano_dir <dir>/
 python src/hm6_detect_body.py    &&  python src/hm6_bodyfit.py --model <dir>/smplh/SMPLH_MALE.pkl --render  # HM6 body
 # HM6 §11.3 대조: HMR2.0(4D-Humans) 학습 회귀 SOTA. neutral SMPL(라이선스) + 별도 venv 필요:
 python src/hmr2_run.py     # HMR2.0 vs 우리 SMPL (같은 실사진, CPU)
+# HM6 §11.4 실 3D GT: HOT3D Aria(라이선스 등록). projectaria_tools/hot3d 툴킷 + MANO 필요:
+python src/hot3d_download.py 0                                 # 1개 시퀀스 최소 다운로드
+python src/hot3d_dump.py                                       # VRS→핀홀 RGB + MANO 3D GT (hot3d env)
+python src/hot3d_fit.py --mano_dir <dir>/mano --render        # 우리 MANO 피팅 → 실 mm MPJPE
 ```
