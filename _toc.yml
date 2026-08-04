@@ -17,6 +17,7 @@ parts:
   - caption: Hand & Human Pose
     chapters:
       - file: hand_pose
+      - file: human_pose
   - caption: Concepts
     chapters:
       - file: concepts
