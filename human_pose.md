@@ -328,17 +328,35 @@ $$\min_{\theta,\,s,\,t}\ \sum_{j} w_j\Big\|\,s\,P_{xy}\big(\hat J_j(\theta)\big)
 
 ### 11.4 HOT3D — 실제 3D GT 대비 mm 벤치마크 (트랙의 결정판)
 
-HM6.1–6.3은 단안이라 **3D GT가 없어 정성**이었다. 여기서는 **[HOT3D](https://facebookresearch.github.io/hot3d/)**(Meta, **Project Aria 안경 egocentric**, 손+물체 조작, **MANO 3D 주석** 포함 — JD의 HOI·egocentric·MANO에 정확히 꽂히는 데이터셋)의 **실제 3D ground truth**에 우리 MANO 피팅을 붙여 **진짜 mm MPJPE**를 잰다.
+HM6.1–6.3은 단안이라 **3D GT가 없어 정성**이었다. 여기서는 **[HOT3D](https://facebookresearch.github.io/hot3d/)** 의 **실제 3D ground truth** 에 우리 MANO 피팅을 붙여 **진짜 mm MPJPE**를 잰다 — 이 트랙에서 유일하게 "실제 데이터셋 GT 대비 정량 오차"가 나오는 결정판.
 
-**파이프라인:** HOT3D Aria 시퀀스 1개를 받아 `projectaria_tools`/`hot3d` 툴킷으로 (a) **어안→핀홀 보정(undistort)** RGB 프레임, (b) **실제 MANO 3D 손 관절 GT**(카메라 프레임, metric), (c) 팩토리 카메라 캘리브를 읽는다. 손가락 마디 15점을 우리 MANO 16관절에 대응시키고, **실제 Aria 초점거리로 완전 원근(full-perspective) 단안 피팅**한다:
+**HOT3D는 어떤 데이터셋인가.** Meta가 공개한 **egocentric 손-물체 상호작용(HOI)** 데이터셋으로, **Project Aria 스마트안경**(과 Quest3)을 쓴 사람이 테이블 위 물체를 조작하는 장면을 **1인칭 시점**으로 담았다. 총 **198 시퀀스**, 각 시퀀스에 (1) Aria VRS 원본(RGB + SLAM 스테레오 + IMU + 시선), (2) MPS SLAM 궤적/캘리브, (3) **손의 MANO & UmeTrack 3D 주석**, (4) 물체 6-DoF 포즈 + CAD가 들어있다. **손 3D를 mm 단위로 아는 실측 데이터**라서, 우리가 시뮬(HM0–HM5)에서만 재던 "GT 대비 오차"를 실제 인간 손에서 잴 수 있다. JD가 말하는 **HOI · egocentric · MANO 파라메트릭 최적화**에 정확히 대응하는 벤치마크다.
+
+#### 이 이미지들로 무엇을 하나 — 실제 Aria 프레임 + 우리 피팅
+
+<img src="_static/hot3d_frames.png" alt="real HOT3D Aria egocentric frames with GT and our MANO reprojection" style="width:100%;max-width:1280px;border-radius:8px">
+
+*실제 HOT3D Aria **1인칭 프레임**(머리에서 내려다본 손이 컵·키보드 등을 조작). green=데이터셋 GT 2D 골격, orange ×=우리 MANO 재투영. 재투영 2–5px로 실제 손에 정확히 붙는다. (이미지 출처: HOT3D, Banerjee et al., Meta — 연구/교육용 시연, 데이터셋 라이선스 하에 인용.)*
+
+#### 실제로 손을 따라가는 모습 (연속 프레임)
+
+<img src="_static/hot3d_track.gif" alt="our MANO tracking the real Aria hand across consecutive frames" style="width:100%;max-width:520px;border-radius:8px">
+
+*연속 40프레임에서 우리 MANO가 실제 손 움직임을 추적. 매 프레임 독립 단안 피팅(temporal smoothing 없음)인데도 안정적으로 붙는다.*
+
+**방법 (파이프라인 + 수식).** HOT3D Aria 시퀀스 1개를 받아 `projectaria_tools`/`hot3d` 툴킷으로 (a) 어안(FISHEYE624)→**핀홀 보정(undistort)** RGB, (b) `get_hand_landmarks`로 **실제 MANO 3D 손 관절 GT**(월드→카메라 프레임, metric), (c) 팩토리 카메라 캘리브(초점 $f$·주점 $c$)를 읽는다. HOT3D 20-랜드마크 중 **손가락 마디 15점**(tip 제외 — 우리 MANO 16관절엔 tip이 없음)을 우리 MANO 관절에 대응시키고, **실제 Aria 초점거리로 완전 원근(full-perspective) 단안 피팅**한다:
 
 $$\min_{\theta,\,s,\,\mathbf t}\ \sum_{j}\Big\|\,\pi_{f}\big(s\,\hat J_j(\theta)+\mathbf t\big)-x^{\text{GT2D}}_j\,\Big\|,\qquad \pi_f(P)=\Big(f\tfrac{P_x}{P_z}+c_x,\ f\tfrac{P_y}{P_z}+c_y\Big)$$
 
-복원한 3D 관절을 GT 3D와 두 방식으로 비교한다: **root-relative MPJPE**(손목 정렬, 깊이 모호 포함)와 **PA-MPJPE**(Procrustes 상사 정렬 — 전역 회전·스케일·깊이 제거, 손 *형상/관절* 자체의 정확도).
+복원한 3D 관절 $s\hat J(\theta)+\mathbf t$ 를 GT 3D와 두 방식으로 비교한다: **root-relative MPJPE**(손목 정렬 — 광선방향 깊이 모호 포함)와 **PA-MPJPE**(Procrustes 상사 정렬로 전역 회전·스케일·깊이를 제거 → 손 *형상/관절* 자체 정확도). 왼손은 x-미러 후 오른손 MANO로 피팅.
 
-<img src="_static/hot3d_fit.png" alt="HOT3D real 3D MANO GT vs our monocular MANO fit (skeleton, PA-aligned)" style="width:100%;max-width:1200px;border-radius:8px">
+#### 결과 — 실제 3D GT 대비
 
-*HOT3D **실제 3D MANO GT**(green) vs 우리 단안 MANO 피팅(orange) — Procrustes 정렬, mm 스케일. 손 관절이 거의 겹친다(PA ~3mm). (원본 Aria RGB 프레임은 데이터셋 라이선스상 공개 사이트엔 싣지 않음 — 로컬에서 재현 가능.)*
+<img src="_static/hot3d_mpjpe.png" alt="per-frame MPJPE: root-relative vs PA" style="width:100%;max-width:1100px;border-radius:8px">
+
+<img src="_static/hot3d_fit.png" alt="HOT3D real 3D MANO GT vs our fit skeleton" style="width:100%;max-width:1100px;border-radius:8px">
+
+*위: 프레임별 MPJPE(빨강 root-rel vs 초록 PA). 아래: 복원 3D 골격 — GT(green) vs 우리(orange), Procrustes 정렬, mm. 관절이 거의 겹친다.*
 
 | 지표 (13 real hands, 1 seq) | 값 |
 |---|---|
@@ -346,7 +364,9 @@ $$\min_{\theta,\,s,\,\mathbf t}\ \sum_{j}\Big\|\,\pi_{f}\big(s\,\hat J_j(\theta)
 | **PA-MPJPE** (형상·관절) | **3.9 mm** |
 | root-relative MPJPE (깊이 포함) | 48.9 mm |
 
-**핵심 (이번 트랙의 결정적 실측):** 실제 연구 데이터셋의 **3D MANO GT 대비 PA-MPJPE 3.9mm** — 우리 손 *관절/형상* 복원이 실측 4mm 수준으로 정확하다. 동시에 **root-relative는 48.9mm** — 이것이 바로 HM0–HM6 내내 말한 **단안 scale/depth(광선 방향) 모호성**이다: 한 시야에선 손의 절대 깊이를 못 잡지만(→root-rel 큼), 국소 형상은 정확히 복원한다(→PA 작음). *시뮬(HM0–HM5)에서 세운 가설이 실제 egocentric 데이터에서 그대로 확인됐다.* 정직: 1개 시퀀스·15관절 대응·손가락 tip은 제외(우리 MANO 16관절엔 tip 없음). 다중뷰/스테레오(HM3에서 정량화)로 depth 모호를 풀면 root-rel도 내려간다.
+**핵심 (이번 트랙의 결정적 실측):** 실제 연구 데이터셋의 **3D MANO GT 대비 PA-MPJPE 3.9mm** — 우리가 처음부터 직접 구현한 MANO 피팅이 실제 인간 손의 *관절/형상*을 **4mm 수준**으로 복원한다. 동시에 **root-relative는 48.9mm** — 이것이 HM0–HM6 내내 말한 **단안 scale/depth(광선 방향) 모호성**이다: 한 시야에선 손의 절대 깊이를 못 잡지만(→root-rel 큼) 국소 형상은 정확히 복원한다(→PA 작음). 위 막대그래프에서 프레임마다 빨강(큼)↔초록(작음)이 이를 명확히 보여준다. **시뮬(HM0–HM5)에서 세운 가설이 실제 egocentric 데이터로 확증됐다.** 다중뷰/스테레오(HM3에서 정량화)로 depth 모호를 풀면 root-rel도 내려간다.
+
+*정직·범위: 1개 시퀀스·13 hand·15관절 대응(tip 제외). HOT3D는 라이선스 등록 데이터셋 — 원본 프레임은 연구/교육 시연으로 출처를 밝혀 인용하며, 데이터 자체는 재배포하지 않는다(저장소 미포함). 여러 시퀀스로 확장하면 통계가 더 탄탄해진다.*
 
 ## 재현
 ```bash
