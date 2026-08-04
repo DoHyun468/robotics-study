@@ -115,10 +115,20 @@ S1의 ORB+PnP 오도메트리를 프론트엔드로 받아, **loop closure**(2�
 
 **loop closure 101개**로 최적화한 결과 **ATE 63.6 mm → 40.1 mm (37% 감소)**. 특기할 점: 백엔드가 *더 나쁜* PnP 오도메트리(63.6 mm)를 다듬어 *가장 좋은* raw 오도메트리(ICP 47.7 mm)보다도 낮은 40.1 mm에 도달했다 — "프론트엔드 선택보다 loop closure가 결정적"이라는 SLAM의 핵심을 실증. 정직한 한계: loop closure만(full landmark BA 아님)이라 drift를 **줄이지만 완전 제거는 아니다**(40 mm 잔차). 또한 1바퀴 폐곡선의 단일 loop closure로는 ATE가 오히려 악화됐는데(오도메트리가 이미 좋고 drift가 끝단에 몰리지 않아 단일 제약이 왜곡), **다중 loop closure가 분포해야 효과**라는 교훈으로 2바퀴 궤도를 채택했다.
 
-### S4 — 뉴럴 SLAM (진행 예정, 차별화)
+### S4 — 뉴럴 SLAM 맵: depth-supervised NeRF (차별화)
 
-3DGS/NeRF RGB-D SLAM(SplaTAM류)로 photorealistic 지도 + tracking을 GT로 벤치마크한다 (§4). 우리 NeRF/3DGS 재구성 배경과 가장 직접 겹치는 차별화 단계.
+S0 RGB-D로 **연속 신경장(NeRF)** 을 직접 구현해 학습하고(positional encoding + MLP, photometric + depth 손실, 순수 PyTorch), held-out 뷰에서 **novel-view synthesis**를 GT와 대조한다. 백엔드(S3)와 잇기 위해 **GT pose vs S3 pose-graph pose** 두 버전을 학습해 비교했다.
+
+<img src="_static/slam_nerf_render.png" alt="NeRF novel-view synthesis vs GT + depth" style="width:100%;max-width:820px;border-radius:8px">
+<img src="_static/slam_nerf_views.png" alt="held-out novel views GT vs NeRF" style="width:100%;max-width:820px;border-radius:8px">
+
+| pose 소스 | novel-view PSNR |
+|---|---|
+| **GT poses** | **25.28 dB** |
+| **S3 poses (pose-graph)** | 23.65 dB |
+
+held-out 뷰에서 테이블·12개 물체·그림자가 인식 가능하게 복원되고 NeRF depth도 깔끔하다(depth 감독 효과). 핵심 관찰: **GT pose가 S3 pose보다 ~1.6 dB 높다** — S3의 잔여 drift(ATE 40 mm)가 렌더링 품질로 그대로 전이되어, **SLAM pose 정확도 → 뉴럴 맵 품질**을 정량 확인. 이로써 오도메트리(S1) → 백엔드(S3) → 뉴럴 맵(S4)이 한 줄로 이어진다. *한계(정직): 컴팩트 MLP NeRF라 SOTA 대비 부드럽고, CUDA rasterizer 미설치로 3DGS가 아닌 NeRF다 — SplaTAM식 3DGS SLAM이 자연스러운 업그레이드.*
 
 ---
 
-*§1–6은 SLAM 개념·논문의 정성적 정리(문헌)이고, §7은 이 프로젝트에서 MuJoCo GT로 직접 측정한 실측 결과다.*
+*§1–6은 SLAM 개념·논문의 정성적 정리(문헌)이고, §7은 이 프로젝트에서 MuJoCo GT로 직접 측정한 실측 결과(S0–S4 전 단계 완료)다.*
