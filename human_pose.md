@@ -57,9 +57,19 @@ $$\min_{\beta,\theta,\mathbf t}\ \sum_{c=1}^{N}\sum_{j}\rho\!\big(\|\pi_c(\hat J
 $\pi_c$ = 카메라 $c$ 의 핀홀 투영, $\rho$ = pseudo-Huber(이상치 완화), 정규화 $\lambda$ 항은 shape/pose prior.
 4. GT 대비 **MPJPE(mm)**·버텍스오차·$\beta$ 오차를 3-seed 평균으로 측정.
 
-<img src="_static/hm_smpl_fit.png" alt="SMPL multi-view body fitting" style="width:100%;max-width:1000px;border-radius:8px">
+### 무엇을 입력으로 보나 (how it works)
 
-*좌: GT 관절(teal)과 복원(주황 ×)·뼈대가 3D에서 겹침. 중: cam-1 재투영(회색=복원 메시 6890버텍스). 우: shape $\beta$ GT vs 복원.*
+그래프만으론 뭘 하는지 안 보이니, **방법이 실제로 보는 입력**부터 보인다. 아래는 SMPL 몸을 4개 캘리브 카메라에서 렌더한 것(음영 메시)이다 — 이게 "관측"이고, 최적화는 이 이미지들의 **2D 관절**(teal)에 SMPL 재투영(orange ×)이 겹치도록 $(\beta,\theta)$ 를 움직인다.
+
+<img src="_static/hm_smpl_views.png" alt="what each camera sees: shaded SMPL body + 2D joints" style="width:100%;max-width:1000px;border-radius:8px">
+
+*카메라 1–4가 같은 사람을 다른 각도에서 본다(음영=SMPL 메시 6890버텍스). teal=관측 2D 관절, orange ×=현재 추정의 재투영. 한 장(단안)으론 전후 depth가 모호 → 여러 각도가 그 모호성을 푼다.*
+
+> **파이프라인 한눈에:** ① N개 캘리브 카메라가 몸을 관측 → ② 각 뷰에서 2D 관절 검출(여기선 GT 투영+노이즈로 대체) → ③ SMPL $(\beta,\theta,\mathbf t)$ 를 **모든 뷰의 재투영오차 최소화**로 최적화(§1의 forward가 미분가능하므로 gradient descent) → ④ 3D 몸(관절·메시) 복원.
+
+<img src="_static/hm_smpl_fit.png" alt="SMPL multi-view body fitting result" style="width:100%;max-width:1000px;border-radius:8px">
+
+*결과: 좌=GT 관절(teal)과 복원(주황 ×)·뼈대가 3D에서 겹침, 중=cam-1 재투영(회색=복원 메시), 우=shape $\beta$ GT vs 복원.*
 
 ## 3. 결과 (3-seed 평균)
 
@@ -67,19 +77,19 @@ $\pi_c$ = 카메라 $c$ 의 핀홀 투영, $\rho$ = pseudo-Huber(이상치 완�
 
 | 뷰 | 1 | 2 | 4 | 8 |
 |---|---|---|---|---|
-| MPJPE | **157.3mm** | 9.3mm | 9.0mm | 8.5mm |
+| MPJPE | **119.1mm** | 9.5mm | 8.5mm | 7.6mm |
 
-**단일 뷰는 157mm로 붕괴**한다 — 전신은 metric depth/scale 모호성이 손보다 훨씬 심하다(팔·다리 전후 위치가 한 뷰로 결정 안 됨). **2뷰만 돼도 9.3mm로 −94%**, 그 뒤 포화. 손에서 본 "멀티뷰 기하가 단안의 약제약을 푼다"가 전신에서 **훨씬 극적**으로 재현된다.
+**단일 뷰는 119mm로 붕괴**한다 — 전신은 metric depth/scale 모호성이 손보다 훨씬 심하다(팔·다리 전후 위치가 한 뷰로 결정 안 됨). **2뷰만 돼도 9.5mm로 −92%**, 그 뒤 완만히 개선(8뷰 7.6mm). 손에서 본 "멀티뷰 기하가 단안의 약제약을 푼다"가 전신에서 **훨씬 극적**으로 재현된다.
 
 **② 픽셀 노이즈** (4뷰)
 
 | 노이즈 | 0px | 1px | 2px | 4px |
 |---|---|---|---|---|
-| MPJPE | 9.0mm | 9.0mm | 8.7mm | 11.2mm |
+| MPJPE | 7.8mm | 8.5mm | 9.4mm | 9.9mm |
 
-손(노이즈에 거의 선형 전파)과 달리 **전신 4뷰 피팅은 2px까지 노이즈에 강건**하고 4px에서만 오른다. ~9mm 바닥은 픽셀노이즈가 아니라 **shape–pose 결합/최적화 수렴**이 지배한다(아래 β).
+2D 검출 노이즈가 3D 오차로 **단조 전파**(7.8→9.9mm) — [perception 오차예산](perception.md)·[손 E1](hand_pose.md)의 "입력 오차→출력 오차 전파"가 전신에서도 성립.
 
-**③ shape $\beta$ 는 키포인트로 완전히는 안 잡힌다**: $\beta$ 오차 ~1.3로 남고 버텍스오차(~18mm)가 관절오차(~9mm)보다 크다. **키포인트는 pose를 제약하지 shape(체형)를 제약하지 않는다** — 손 [E4](hand_pose.md)에서 표면 관측을 더해 풀었던 것과 동일한 한계. 전신 체형 복원엔 실루엣/표면 항이 필요하다.
+**③ shape $\beta$ 는 키포인트로 완전히는 안 잡힌다**: $\beta$ 오차 ~1.7로 남고 버텍스오차(~18mm)가 관절오차(~8mm)보다 크다. **키포인트는 pose를 제약하지 shape(체형)를 제약하지 않는다** — 손 [E4](hand_pose.md)에서 표면 관측을 더해 풀었던 것과 동일한 한계. 전신 체형 복원엔 실루엣/표면 항이 필요하다.
 
 ## 4. 정직/한계
 - SMPL forward를 직접 구현(shape/pose blendshape + LBS)했고, GT 생성·복원에 **동일 forward**를 써 자기일관적으로 fitting 성능만 측정한다(모델 자체의 캐노니컬 정확도가 아니라 **복원 오차** 연구).
@@ -90,8 +100,51 @@ $\pi_c$ = 카메라 $c$ 의 핀홀 투영, $\rho$ = pseudo-Huber(이상치 완�
 ## 5. 연결
 [손(MANO) 관절체 피팅](hand_pose.md)이 "변형 가능한 형상 모델을 알면 손 관절이 잡힌다"였다면, 이건 그 구조가 **6890버텍스·52관절 전신**에서 동일하게(멀티뷰·노이즈·shape 관측성) 성립함을 보인다. 다음: **SMPL-X 전신+손+얼굴**(HM1), **HOI 손-물체 공동**(HM2), **egocentric**(HM3), **다중센서 동기화**(HM4), **Human→Robot retargeting**(HM5). 전체 계획은 `robotics-lab/notes/human_plan.md`.
 
+## 6. HM1 — whole-body(몸 + 양손) + β/scale 추정
+
+HM0(몸 22관절)에서 **양손 30관절까지 함께** 최적화하고, JD가 콕 집은 **global scale** 파라미터를 추가해 "shape/pose 최적화(β/scale 추정)"를 정면으로 다룬다. (얼굴까지는 SMPL-X 모델이 필요 — 여기선 SMPL+H로 몸+손.)
+
+**입력(무엇을 보나):** 몸 카메라가 보는 것 — 손은 프레임에서 아주 작다(수십 px).
+
+<img src="_static/hm1_views.png" alt="whole-body input views" style="width:100%;max-width:1000px;border-radius:8px">
+
+*4개 카메라에서 본 사람(음영 메시) + 52개 관절(teal 관측 / orange × 재투영). 손 관절이 몸 카메라에선 작게 뭉쳐 있다 → 약하게 제약됨.*
+
+<img src="_static/hm1_wholebody.png" alt="whole-body fit + beta/scale" style="width:100%;max-width:1000px;border-radius:8px">
+
+*좌=whole-body GT vs 복원(몸+손), 중=shape β, 우=global scale 복원.*
+
+**① scale 관측성 (β/scale 추정의 핵심)**
+
+| 뷰 | 1 | 2 | 4 | 8 |
+|---|---|---|---|---|
+| scale 오차 | **4.3%** | 1.1% | **0.8%** | 1.1% |
+| body MPJPE | 247.9mm | 8.3mm | 8.0mm | 7.9mm |
+
+**단안은 scale-depth 모호성**으로 크기를 못 잡는다(4.3%, 몸도 248mm로 붕괴) — 큰 사람이 멀리 있는 것과 작은 사람이 가까이 있는 게 한 뷰에선 동일하게 보이기 때문. **metric 멀티뷰 리그는 baseline이 절대 크기를 고정**해 scale을 <1%로 복원한다. 실무에서 "카메라 리그로 metric scale 확보"가 왜 중요한지의 정량 근거.
+
+**② 손은 몸 카메라에서 훨씬 어렵다**
+
+| 뷰 | 2 | 4 | 8 |
+|---|---|---|---|
+| body MPJPE | 8.3mm | 8.0mm | 7.9mm |
+| **hand MPJPE** | 20.8mm | 19.4mm | **17.2mm** |
+
+**손 오차가 몸의 ~2.4배**(4뷰 19 vs 8mm). 손이 몸 카메라 프레임에서 수십 px밖에 안 돼 관절이 약하게 제약되기 때문 — **정밀한 손 자세엔 근접/egocentric(머리장착) 카메라가 필요**하다는 정량 근거(→ HM3). shape β도 whole-body에선 더 어렵다(β 오차 ~1.9).
+
+## 7. 데이터셋 (실데이터는 HM6)
+
+HM0·HM1은 **시뮬레이션**이다 — GT SMPL을 샘플링해 렌더하고, 그 관측으로 복원한다(GT를 알기에 오차를 mm로 잴 수 있음). **실제 데이터셋 검증은 HM6**에서 하며, 그때 해당 데이터셋의 실제 프레임(우리가 돌린 결과)을 올린다. 계획 데이터셋:
+
+- **[HOT3D](https://facebookresearch.github.io/hot3d/)** (Meta, Aria/Quest egocentric, MANO 손 주석) — egocentric 손+물체.
+- **[AssemblyHands](https://assemblyhands.github.io/)** (Assembly101 기반, ego+exo 동기, 3M 이미지) — egocentric 손.
+- 전신은 **monocular HMR2.0/4D-Humans** 를 인터넷 영상에 돌려 정성 검증.
+
+(각 데이터셋의 라이선스·다운로드가 필요하며, HM6 진입 시 실제 예시 이미지/영상을 이 페이지에 추가한다.)
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
-python src/hm_smpl_fit.py --model <dir>/smplh/SMPLH_MALE.pkl --sweep --render
+python src/hm_smpl_fit.py   --model <dir>/smplh/SMPLH_MALE.pkl --sweep --render   # HM0 body
+python src/hm1_wholebody.py --model <dir>/smplh/SMPLH_MALE.pkl --sweep --render   # HM1 whole-body+scale
 ```
