@@ -122,12 +122,21 @@ S0 RGB-D로 **연속 신경장(NeRF)** 을 직접 구현해 학습하고(positio
 <img src="_static/slam_nerf_render.png" alt="NeRF novel-view synthesis vs GT + depth" style="width:100%;max-width:820px;border-radius:8px">
 <img src="_static/slam_nerf_views.png" alt="held-out novel views GT vs NeRF" style="width:100%;max-width:820px;border-radius:8px">
 
-| pose 소스 | novel-view PSNR |
-|---|---|
-| **GT poses** | **25.28 dB** |
-| **S3 poses (pose-graph)** | 23.65 dB |
+held-out 뷰에서 테이블·12개 물체·그림자가 인식 가능하게 복원되고 NeRF depth도 깔끔하다(depth 감독 효과). NeRF는 GT pose 25.28 dB / S3 pose 23.65 dB.
 
-held-out 뷰에서 테이블·12개 물체·그림자가 인식 가능하게 복원되고 NeRF depth도 깔끔하다(depth 감독 효과). 핵심 관찰: **GT pose가 S3 pose보다 ~1.6 dB 높다** — S3의 잔여 drift(ATE 40 mm)가 렌더링 품질로 그대로 전이되어, **SLAM pose 정확도 → 뉴럴 맵 품질**을 정량 확인. 이로써 오도메트리(S1) → 백엔드(S3) → 뉴럴 맵(S4)이 한 줄로 이어진다. *한계(정직): 컴팩트 MLP NeRF라 SOTA 대비 부드럽고, CUDA rasterizer 미설치로 3DGS가 아닌 NeRF다 — SplaTAM식 3DGS SLAM이 자연스러운 업그레이드.*
+### S4b — 3D Gaussian Splatting 업그레이드 (SOTA 표현)
+
+NeRF를 **진짜 3D Gaussian Splatting**으로 업그레이드했다. gaussian을 RGB-D back-projection(180k)으로 초기화하고 gsplat의 미분가능 CUDA rasterizer로 최적화한다(CUDA 12.1 toolkit + gcc-12 host compiler 셋업). 동일 프로토콜로 NeRF와 직접 비교.
+
+<img src="_static/slam_3dgs_render.png" alt="3DGS novel-view synthesis vs GT" style="width:100%;max-width:820px;border-radius:8px">
+
+| 표현 | GT pose | S3 pose | 학습시간 |
+|---|---|---|---|
+| **3DGS** | **33.08 dB** | 27.97 dB | ~15 s |
+| NeRF (S4) | 25.28 dB | 23.65 dB | ~88 s |
+
+- **3DGS가 NeRF보다 ~8 dB 높고 ~6× 빠르다** — 렌더가 거의 photorealistic(물체 모서리·그림자·바닥·스카이까지 선명). RGB-D init + gsplat rasterizer의 효율.
+- **핵심(SLAM 연결):** GT vs S3 pose 격차가 3DGS에선 **~5.1 dB**(33.1 vs 28.0)로 NeRF의 ~1.6 dB보다 크다. 선명한 gaussian은 pose 오차(S3 잔여 drift 40 mm)에 더 민감 → **정확한 SLAM pose가 뉴럴 맵 품질에 더 결정적**임을 정량 확인. 오도메트리(S1) → 백엔드(S3) → 뉴럴 맵(S4/S4b)이 한 줄로 이어진다. *한계(정직): densification/배경 gaussian·tracking 미구현 — SplaTAM식 joint tracking+3DGS가 다음.*
 
 ---
 
