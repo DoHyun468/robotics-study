@@ -71,14 +71,54 @@
 
 공부 순서: Tier 0(필요분) → Tier 1 이론 + ORB-SLAM3 돌려보기 → Tier 2 서베이 + 우리 셋업에서 RGB-D/3DGS SLAM 실측.
 
-## 7. 우리 실측 계획 (별도 · 진행 예정)
+## 7. 우리 실측 (직접 구현 · GT 벤치마크)
 
-문헌과 분리해, MuJoCo 위에서 단계별로 직접 구현하고 **GT로 벤치마크**한다:
+문헌과 분리해, MuJoCo 위에서 단계별로 직접 구현하고 **GT 카메라 궤적으로 정량 벤치마크**한다. 셋업은 공통: feature-rich 정지 테이블탑을 카메라가 **2바퀴 궤도(720°, 200프레임, 640×480)** 로 돌며 RGB-D를 렌더, MuJoCo `cam_xmat/cam_xpos`로 GT pose를, `fovy→K`로 intrinsic을 기록(전부 OpenCV 규약). 렌더는 CPU(osmesa)로 GPU 없이 결정적으로 재현된다. GT 경로 길이 **786 cm**.
 
-- **S0** 움직이는 카메라 RGB-D+GT 시퀀스 생성 → **S1** RGB-D 오도메트리(ICP scan-to-scan + ORB/PnP, ATE/RPE) → **S2** TSDF 맵핑 → **S3** ORB-SLAM3 벤치마크 + 미니 pose-graph(루프클로저) → **S4** 뉴럴 3DGS SLAM.
+> 진행: **S0–S3 완료**, S4(뉴럴 3DGS SLAM)는 진행 예정. 아래 수치는 모두 이 셋업에서 직접 측정한 값이다. 요약 결과 페이지(그림·수치): [SLAM S0–S3 아티팩트](https://claude.ai/code/artifact/37e74c2a-23e4-40f6-b981-4447807e2bc3).
 
-각 단계 결과(영상·궤적·오차 그래프)는 완성되는 대로 실측 섹션에 추가한다. 기존 [perception](perception.md)의 캘리브·ICP·RGB-D 프리미티브를 그대로 재사용한다.
+### S0 — 움직이는 카메라 RGB-D + GT 시퀀스 생성기
+
+카메라를 mocap body에 얹어 궤도로 움직이며 매 프레임 RGB + metric depth + GT pose를 저장한다. 단일-샷·고정 카메라였던 [perception](perception.md)에 **시간축과 카메라 자기운동**을 더한 것으로, 이후 모든 단계의 입력이자 정답지(GT)다. GT 회전 행렬 orthonormal 오차 ~1e-15, depth valid 96–100%.
+
+<img src="_static/slam_orbit.gif" alt="orbiting camera RGB preview" style="width:100%;max-width:820px;border-radius:8px">
+<img src="_static/slam_rgb_sample.png" alt="sample RGB-D frame" style="width:100%;max-width:820px;border-radius:8px">
+
+### S1 — RGB-D 시각 오도메트리 (VO)
+
+두 프론트엔드를 **독립 구현**해 비교한다: ① **point-to-plane ICP** scan-to-scan(선형화 6-DoF 최소자승, 법선 추정) ② **ORB + RGB-D PnP**(RANSAC). 각각 GT pose[0]에서 상대 모션을 적분해 궤적을 만들고, **정지(무모션) baseline**과 함께 GT와 대조한다.
+
+<img src="_static/slam_vo_traj.png" alt="VO trajectory vs GT (top-down)" style="width:100%;max-width:820px;border-radius:8px">
+
+| 방법 | ATE | RPE Δ1 | RPE Δ10 |
+|---|---|---|---|
+| **ICP (point-to-plane)** | **47.7 mm** (0.6% of path) | 2.5 mm / 0.13° | 14.9 mm / 0.83° |
+| **ORB + PnP** | 63.6 mm (0.8%) | 3.6 mm / 0.23° | 25.0 mm / 1.72° |
+| static baseline | 621.4 mm | 39.5 mm | 388.3 mm |
+
+두 VO 모두 정지 baseline(621 mm) 대비 **10–13× 우수** → 좌표 규약·적분이 정확함을 확인. 긴 2바퀴 궤적에선 dense ICP가 특징기반 PnP보다 안정적이었다(짧은 궤적 초기 실험에선 반대 — 궤적 길이에 따라 순위가 바뀌는 정직한 관찰). **loop closure/BA가 없는 순수 오도메트리라 drift가 누적**되며(추정 궤도가 GT보다 안쪽으로 수축), 이것이 S3의 보정 대상이다.
+
+### S2 — TSDF 맵핑 (drift가 지도에 주는 영향)
+
+같은 RGB-D를 **pose 소스만 바꿔가며**(GT / ICP / PnP) open3d TSDF로 융합해 하나의 컬러 3D 복원을 만든다. 궤적이 정확할수록 지도가 선명하고, drift가 크면 지도가 뒤틀리고 번진다.
+
+<img src="_static/slam_map_compare.png" alt="TSDF reconstruction GT vs estimated poses" style="width:100%;max-width:820px;border-radius:8px">
+
+지도 품질은 GT-pose 지도 대비 **대칭 Chamfer 거리**(테이블탑 씬, 바닥 제외)로 잰다: **ICP 11.3 mm < ORB+PnP 14.3 mm** — S1 ATE 순위와 일치(궤적 정확 → 지도 정확). *방법 메모: 처음엔 바닥을 포함했더니 지표가 눈에 보이는 왜곡과 어긋났다. 평평한 바닥은 수직축 yaw 회전에 거의 불변이라 회전 drift를 가리기 때문 — 씬(테이블·물체)만 크롭해 정정했다. 단일 지표를 시각과 대조 없이 믿지 않는다.*
+
+### S3 — Pose-graph SLAM 백엔드 (loop closure로 drift 보정)
+
+S1의 ORB+PnP 오도메트리를 프론트엔드로 받아, **loop closure**(2번째 바퀴가 1번째 바퀴를 재방문하는 프레임쌍을 ORB+PnP로 매칭)를 검출하고 전체 pose graph를 **SE(3) 매니폴드에서 Gauss-Newton으로 최적화**한다. ORB-SLAM3 빌드 대신 `exp/log`·adjoint·희소 GN solver를 직접 구현했다(리군 기하·최소자승 상태추정).
+
+<img src="_static/slam_posegraph.png" alt="pose-graph SLAM before/after vs GT" style="width:100%;max-width:820px;border-radius:8px">
+<img src="_static/slam_pg_ate.png" alt="ATE before/after loop closure" style="width:100%;max-width:520px;border-radius:8px">
+
+**loop closure 101개**로 최적화한 결과 **ATE 63.6 mm → 40.1 mm (37% 감소)**. 특기할 점: 백엔드가 *더 나쁜* PnP 오도메트리(63.6 mm)를 다듬어 *가장 좋은* raw 오도메트리(ICP 47.7 mm)보다도 낮은 40.1 mm에 도달했다 — "프론트엔드 선택보다 loop closure가 결정적"이라는 SLAM의 핵심을 실증. 정직한 한계: loop closure만(full landmark BA 아님)이라 drift를 **줄이지만 완전 제거는 아니다**(40 mm 잔차). 또한 1바퀴 폐곡선의 단일 loop closure로는 ATE가 오히려 악화됐는데(오도메트리가 이미 좋고 drift가 끝단에 몰리지 않아 단일 제약이 왜곡), **다중 loop closure가 분포해야 효과**라는 교훈으로 2바퀴 궤도를 채택했다.
+
+### S4 — 뉴럴 SLAM (진행 예정, 차별화)
+
+3DGS/NeRF RGB-D SLAM(SplaTAM류)로 photorealistic 지도 + tracking을 GT로 벤치마크한다 (§4). 우리 NeRF/3DGS 재구성 배경과 가장 직접 겹치는 차별화 단계.
 
 ---
 
-*이 페이지는 SLAM 개념·논문의 정성적 정리(문헌)이며, 이 프로젝트에서 직접 측정한 수치가 아니다. 실측 결과는 §7의 실측 트랙에서 별도로 다룬다.*
+*§1–6은 SLAM 개념·논문의 정성적 정리(문헌)이고, §7은 이 프로젝트에서 MuJoCo GT로 직접 측정한 실측 결과다.*
