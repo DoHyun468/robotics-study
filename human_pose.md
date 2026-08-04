@@ -179,7 +179,27 @@ HM1·HM2에서 **손은 몸/원거리(exocentric) 카메라에서 약하게 제�
 3. **Ego 스테레오가 metric depth를 준다**(6.2mm) — 실제 헤드셋(Quest·Aria·[HOT3D](https://facebookresearch.github.io/hot3d/))이 근접 스테레오 카메라를 쓰는 이유.
 4. **ego+exo 융합은 가림에 강건**(가림 40%에서 단일 ego 77mm → ego+3exo 3.9mm) — 한 뷰에서 가려진 손가락을 다른 뷰가 채운다.
 
-## 9. 데이터셋 (실데이터는 HM6)
+## 9. HM4 — 다중센서 시공간 캘리브레이션·동기화 (camera↔IMU)
+
+perception·hand-eye에서 한 건 **spatial** 캘리브였다. HM4는 빠져 있던 **temporal(시간 오프셋 $t_d$) + IMU**를 채운다. 강체로 붙은 두 센서가 같은 모션을 보지만 (a) **클럭이 $t_d$만큼 어긋나고** (b) 프레임이 **extrinsic 회전 $R_{ci}$** 로 다르다. 둘을 **각속도 스트림 정합**으로 동시 추정한다 — Kalibr/VINS online temporal calibration의 핵심 원리.
+
+$$w_\text{imu}(t)=R_{ci}^\top\,w_\text{cam}(t-t_d)+\text{noise};\qquad \min_{t_d,\,R_{ci}}\ \sum_t\big\|\,w_\text{imu}(t)-R_{ci}^\top\,\text{interp}\big(w_\text{cam},\,t-t_d\big)\big\|^2$$
+
+$t_d$에 대한 **미분가능 선형보간**으로 gradient descent가 동기화를 푼다.
+
+<img src="_static/hm4_sync.png" alt="camera-IMU temporal+spatial calibration before/after" style="width:100%;max-width:1100px;border-radius:8px">
+
+*위=보정 전(카메라 solid vs IMU dashed): $t_d$=60ms 어긋남 + extrinsic 34°로 축이 섞임. 아래=추정 후($t_d$·$R_{ci}$ 복원): 두 스트림이 겹친다.*
+
+| 조건 | $t_d$ 오차 | extrinsic 오차 |
+|---|---|---|
+| baseline (노이즈 0.02 rad/s, $t_d$ 30ms) | **2.1 ms** | **0.26°** |
+| 노이즈 0 / 0.05 / 0.1 | 0 / 8.5 / 75 ms | 0 / 1.1 / 7.0° |
+| **모션 amp 0.15 / 0.4 / 1.0** | 54.8 / 9.6 / **2.1 ms** | 4.9 / 1.2 / 0.26° |
+
+**핵심:** 시간 오프셋을 **~2ms**, extrinsic 회전을 **0.26°** 로 복원. 노이즈에 단조 열화. **모션 excitation이 관측성의 열쇠** — 회전이 작으면(amp 0.15) 55ms/4.9°로 무너지고, 충분히 흔들면(amp 1.0) 2ms/0.26°. Kalibr가 "모든 축을 충분히 흔들라"고 요구하는 이유를 실측으로 확인. *정직: 각속도(gyro)로 $t_d$·회전 extrinsic까지. 완전한 spatial(translation lever-arm)엔 accelerometer가 추가로 필요(확장 가능).*
+
+## 10. 데이터셋 (실데이터는 HM6)
 
 HM0·HM1은 **시뮬레이션**이다 — GT SMPL을 샘플링해 렌더하고, 그 관측으로 복원한다(GT를 알기에 오차를 mm로 잴 수 있음). **실제 데이터셋 검증은 HM6**에서 하며, 그때 해당 데이터셋의 실제 프레임(우리가 돌린 결과)을 올린다. 계획 데이터셋:
 
