@@ -258,15 +258,53 @@ $$\min_q\ \big[\text{(위 식)}\big] + w_\text{col}\,d_\text{pen}(q)^2,\qquad w_
 
 **핵심:** 8개 keyvector 매칭 + Kabsch 정렬 + bound 최적화로 **관절 한계·자기충돌을 모두 만족하는 실행 가능한 grasp 궤적**을 만들고, smoothing·interpolation까지 붙였다. *정직: 잔차 ~58mm는 **cross-morphology 구조 차이**(사람 5손가락↔로봇 4손가락, 엄지 대향 구조가 특히 다름)에서 오는 근본 한계로, 완벽히 0이 될 수 없다 — 그래서 절대 위치가 아닌 keyvector(상대 기하)를 맞춘다. 실로봇 배포엔 (a) 팔 IK를 붙여 손목 6-DoF 궤적까지, (b) 접촉면 mesh 기반 충돌, (c) 힘/토크 feasibility를 추가한다(확장 가능).*
 
-## 11. 데이터셋 (실데이터는 HM6)
+## 11. HM6 — 실데이터 검증 (실제 사진 → 우리 파라메트릭 모델 피팅)
 
-HM0·HM1은 **시뮬레이션**이다 — GT SMPL을 샘플링해 렌더하고, 그 관측으로 복원한다(GT를 알기에 오차를 mm로 잴 수 있음). **실제 데이터셋 검증은 HM6**에서 하며, 그때 해당 데이터셋의 실제 프레임(우리가 돌린 결과)을 올린다. 계획 데이터셋:
+HM0–HM5는 전부 **시뮬레이션**이었다(GT를 알기에 mm 오차를 잴 수 있었음). HM6는 그 파이프라인을 **진짜 픽셀**에 돌려 닫는다. 레시피는 손·전신 공통이다: 실제 사진에서 **MediaPipe**로 2D 랜드마크를 검출하고(검출은 남의 모델), 그 검출에 **우리가 직접 구현한 파라메트릭 모델**(손=MANO, 전신=SMPL)을 약투영 단안 최적화로 맞춘다(피팅은 우리 코드). GT 3D가 없으니(실사진 1장) 품질 지표는 **2D 재투영 오차(px)** 이고, 이는 HM0–HM3의 단안 모호성 교훈을 실데이터에서 재확인하는 **정성 검증**이다.
 
-- **[HOT3D](https://facebookresearch.github.io/hot3d/)** (Meta, Aria/Quest egocentric, MANO 손 주석) — egocentric 손+물체.
-- **[AssemblyHands](https://assemblyhands.github.io/)** (Assembly101 기반, ego+exo 동기, 3M 이미지) — egocentric 손.
-- 전신은 **monocular HMR2.0/4D-Humans** 를 인터넷 영상에 돌려 정성 검증.
+### 11.1 손 (MANO)
 
-(각 데이터셋의 라이선스·다운로드가 필요하며, HM6 진입 시 실제 예시 이미지/영상을 이 페이지에 추가한다.)
+실제 손 사진에서 **MediaPipe Hands**로 21점을 검출하고 우리 MANO를 피팅한다.
+
+**방법(약투영·weak-perspective 단안 피팅):** MediaPipe 21점을 MANO 16관절(손목 + 손가락별 MCP/PIP/DIP)에 대응시키고, MANO 자세 $\theta$(PCA)와 약투영 카메라(스케일 $s$·평행이동 $t$)를 아래로 최적화한다 — 스케일-깊이 모호를 피하려 원근 대신 약투영을 쓴다:
+
+$$\min_{\theta,\,s,\,t}\ \sum_{j=1}^{16}\Big\|\,s\,m\,P_{xy}\big(\hat J_j(\theta)\big)+t\;-\;x^{\text{det}}_j\,\Big\|\;+\;\lambda\|\theta\|^2$$
+
+$P_{xy}$ = 관절의 $(x,y)$ 성분(직교투영), $m{=}{\pm}1$ 좌우손 반전, $x^{\text{det}}_j$ = MediaPipe 검출 2D. 2단계(카메라+전역회전 먼저 → 관절 자세 추가) Adam.
+
+<img src="_static/hm6_realfit.png" alt="real photos -> MediaPipe 2D -> our MANO fit" style="width:100%;max-width:1200px;border-radius:8px">
+
+*위=실제 사진 + MediaPipe 검출(green) vs 우리 MANO 재투영(orange ×). 아래=복원된 3D MANO를 **40° 회전**해 본 것 — pointing은 검지, victory는 두 손가락이 실제로 3D에서 펴져 복원됨(단안 사진 1장에서).*
+
+| 실제 사진 (제스처) | 손 | 2D 재투영 오차 |
+|---|---|---|
+| pointing up | Left | **8.8 px** (1.5% diag) |
+| thumbs up | Right | 10.8 px |
+| victory | Right | 16.5 px |
+| woman hands | Right | 27.3 px |
+| woman hands | Left | 40.4 px |
+| **평균 (5 hands)** | | **20.8 px** (2.4% diag) |
+
+**핵심:** 시뮬로 만든 우리 MANO 피팅이 **실제 사진에서도 작동** — 명확한 제스처는 2D 재투영 8–17px, 3D 자세(pointing/victory)가 의미적으로 옳게 복원된다. *정직: (1) **단안이라 3D GT가 없어 정성**이다(mm 못 잼) — 2D는 잘 맞아도 out-of-plane 깊이는 모호(HM0–HM3에서 정량화한 그 모호성). (2) `woman hands`가 27–40px로 더 나쁜 건 손이 기울어 foreshortening + 팔에 일부 가림 때문. (3) MediaPipe(검출)는 남의 모델이고, **피팅은 우리 코드**다.*
+
+### 11.2 전신 (SMPL)
+
+같은 레시피를 전신에 적용한다: **MediaPipe Pose**로 33점 body 랜드마크를 검출하고, **HM0에서 직접 구현한 SMPL**(shape/pose blendshape + LBS)을 피팅한다 — 관절이 63-DoF로 많고 2D 대응이 14점뿐이라 body 자세에 prior를 걸고, 관절별 **가시성(visibility)으로 가중**한다.
+
+$$\min_{\theta,\,s,\,t}\ \sum_{j} w_j\Big\|\,s\,P_{xy}\big(\hat J_j(\theta)\big)+t\;-\;x^{\text{det}}_j\,\Big\|\;+\;\lambda\|\theta_{\text{body}}\|^2,\qquad w_j=\text{visibility}_j$$
+
+대응: MediaPipe {어깨·팔꿈치·손목·엉덩이·무릎·발목·코} → SMPL {16/17·18/19·20/21·1/2·4/5·7/8·15}, 골반(SMPL 0)은 좌우 엉덩이 중점으로 합성.
+
+<img src="_static/hm6_bodyfit.png" alt="real photos -> MediaPipe Pose 2D -> our SMPL fit" style="width:100%;max-width:1100px;border-radius:8px">
+
+*위=실제 사진 + MediaPipe Pose(green) vs 우리 SMPL 재투영(orange ×). 아래=복원된 3D SMPL을 30° 회전 — 요가 warrior 자세(팔 벌림 + 런지)가 단안 사진 1장에서 3D로 복원된다.*
+
+| 실제 사진 | 2D 재투영 오차 |
+|---|---|
+| yoga warrior (`pose`) | **1.9 px** (0.16% diag) |
+| running (`bolt`, 동적) | 55.0 px (6.7% diag) |
+
+**핵심:** 우리 SMPL 피팅이 실사진에서 작동 — 정적·명확한 자세(yoga)는 **재투영 1.9px**로 3D 전신을 정확히 복원한다. *정직: `bolt`가 55px로 나쁜 건 (a) 질주 중 다리가 강하게 foreshortening되고 (b) 단안이라 out-of-plane 다리 각도가 모호 + (c) 14점·prior 정규화로 극단 자세가 눌리기 때문 — HM0/HM1에서 본 단안 붕괴가 실데이터에서도 그대로. mm 단위 3D GT가 필요하면 [HOT3D](https://facebookresearch.github.io/hot3d/)·[AssemblyHands](https://assemblyhands.github.io/)(손) 또는 3DPW/EMDB(전신) 같은 라이선스 데이터셋으로 확장한다(등록 다운로드 필요).*
 
 ## 재현
 ```bash
@@ -275,4 +313,7 @@ python src/hm_smpl_fit.py   --model <dir>/smplh/SMPLH_MALE.pkl --sweep --render 
 python src/hm1_wholebody.py --model <dir>/smplh/SMPLH_MALE.pkl --sweep --render   # HM1 whole-body+scale
 python src/hm4_calib_sync.py --render                                              # HM4 camera-IMU sync
 MUJOCO_GL=osmesa python src/hm5_retarget.py --mano_dir <dir>/mano --render        # HM5 MANO->Allegro retarget
+# HM6 real data (MediaPipe detect in its own venv -> our MANO/SMPL fit in the main env):
+python src/hm6_detect.py         &&  python src/hm6_realfit.py --mano_dir <dir>/mano --render  # HM6 hands
+python src/hm6_detect_body.py    &&  python src/hm6_bodyfit.py --model <dir>/smplh/SMPLH_MALE.pkl --render  # HM6 body
 ```
