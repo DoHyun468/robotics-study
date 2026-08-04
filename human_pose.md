@@ -304,7 +304,27 @@ $$\min_{\theta,\,s,\,t}\ \sum_{j} w_j\Big\|\,s\,P_{xy}\big(\hat J_j(\theta)\big)
 | yoga warrior (`pose`) | **1.9 px** (0.16% diag) |
 | running (`bolt`, 동적) | 55.0 px (6.7% diag) |
 
-**핵심:** 우리 SMPL 피팅이 실사진에서 작동 — 정적·명확한 자세(yoga)는 **재투영 1.9px**로 3D 전신을 정확히 복원한다. *정직: `bolt`가 55px로 나쁜 건 (a) 질주 중 다리가 강하게 foreshortening되고 (b) 단안이라 out-of-plane 다리 각도가 모호 + (c) 14점·prior 정규화로 극단 자세가 눌리기 때문 — HM0/HM1에서 본 단안 붕괴가 실데이터에서도 그대로. mm 단위 3D GT가 필요하면 [HOT3D](https://facebookresearch.github.io/hot3d/)·[AssemblyHands](https://assemblyhands.github.io/)(손) 또는 3DPW/EMDB(전신) 같은 라이선스 데이터셋으로 확장한다(등록 다운로드 필요).*
+**핵심:** 우리 SMPL 피팅이 실사진에서 작동 — 정적·명확한 자세(yoga)는 **재투영 1.9px**로 3D 전신을 정확히 복원한다. *정직: `bolt`가 55px로 나쁜 건 (a) 질주 중 다리가 강하게 foreshortening되고 (b) 단안이라 out-of-plane 다리 각도가 모호 + (c) 14점·prior 정규화로 극단 자세가 눌리기 때문 — HM0/HM1에서 본 단안 붕괴가 실데이터에서도 그대로.*
+
+### 11.3 최적화(우리) vs 학습 회귀(HMR2.0) 대조
+
+같은 실사진 2장에 **SOTA 학습 회귀 모델 [HMR2.0](https://shubham-goel.github.io/4dhumans/)**(4D-Humans, ViT-Huge 백본이 픽셀에서 SMPL 파라미터를 **직접 회귀**)을 돌려 우리 최적화 피팅과 대조했다. 우리 방식은 검출된 2D 키포인트에 **재투영을 직접 최소화**하고, HMR2.0은 2D를 **보지 않고** 이미지에서 학습된 prior로 3D를 추정한다는 게 근본 차이다. (SMPL neutral 모델 라이선스 필요, CPU 추론.)
+
+<img src="_static/hmr2_realfit.png" alt="HMR2.0 learned SMPL regression on the same real photos" style="width:100%;max-width:1100px;border-radius:8px">
+
+*HMR2.0 결과: 위=메시 투영 오버레이(green=MediaPipe, orange ×=HMR2.0 재투영), 아래=복원 3D 30° 회전. bolt의 질주 lean, pose의 warrior 자세가 3D로 복원된다.*
+
+| 실제 사진 | 우리 SMPL (최적화) | HMR2.0 (학습 회귀) |
+|---|---|---|
+| yoga warrior (정적·명확) | **1.9 px** | 9.6 px |
+| running bolt (동적·foreshortening) | 55.0 px | **18.1 px** |
+
+**핵심 통찰 (둘의 성격이 정반대):**
+- **정적·명확한 자세**에선 **최적화(우리)가 2D 재투영에서 더 낮다**(1.9 vs 9.6px) — 그 키포인트에 직접 맞추니까. 단, 이건 *2D* 지표이고 HMR2.0의 3D가 더 정확할 수 있다(2D를 과적합하지 않으므로).
+- **동적·모호한 자세**에선 **학습 회귀(HMR2.0)가 압도적**이다(18 vs 55px). 단안 depth/foreshortening 모호를 **데이터에서 배운 prior**로 풀기 때문 — 우리 단일이미지 최적화는 그 모호에서 붕괴(bolt 55px)했지만 HMR2.0은 그럴듯한 질주 3D를 복원.
+- 이게 이 분야의 교과서적 교훈이다: **최적화 = 정확하지만 취약(brittle), 학습 회귀 = 강건하지만 데이터 의존.** 그래서 실제 SOTA 파이프라인은 **회귀로 초기화 → 최적화로 정밀화**(SMPLify/HMR2+fitting)로 둘을 결합한다. 우리 트랙은 최적화 쪽(HM0–HM6)을 직접 구현했고, 여기서 회귀 SOTA와 정량 대조까지 했다.
+
+*정직: HMR2.0은 남의 사전학습 모델이고 neutral SMPL(라이선스)이 필요하다. mm 단위 3D GT 벤치는 여전히 [HOT3D](https://facebookresearch.github.io/hot3d/)·3DPW/EMDB 같은 라이선스 데이터셋이 있어야 한다.*
 
 ## 재현
 ```bash
@@ -316,4 +336,6 @@ MUJOCO_GL=osmesa python src/hm5_retarget.py --mano_dir <dir>/mano --render      
 # HM6 real data (MediaPipe detect in its own venv -> our MANO/SMPL fit in the main env):
 python src/hm6_detect.py         &&  python src/hm6_realfit.py --mano_dir <dir>/mano --render  # HM6 hands
 python src/hm6_detect_body.py    &&  python src/hm6_bodyfit.py --model <dir>/smplh/SMPLH_MALE.pkl --render  # HM6 body
+# HM6 §11.3 대조: HMR2.0(4D-Humans) 학습 회귀 SOTA. neutral SMPL(라이선스) + 별도 venv 필요:
+python src/hmr2_run.py     # HMR2.0 vs 우리 SMPL (같은 실사진, CPU)
 ```
