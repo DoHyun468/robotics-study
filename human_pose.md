@@ -551,6 +551,25 @@ $$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert 
 
 **→ 트랙의 완결:** HM5(합성 retarget) → §11.8(실 grasp retarget) → §11.9(접촉 제약 + 벽 발견) → **§11.10(grasp 합성으로 벽 돌파)**. perception→action이 다른 morphology로 넘어갈 때 필요한 것 — 3D 인식, 접촉 이해, 도달성·안정성 최적화 — 을 실데이터로 관통했다.
 
+### 11.11 6-DoF 손 배치 + "무엇을 최적화하는가"가 결정한다
+
+**왜 이걸 하나 (§11.10을 더 밀어보기).** §11.10은 손을 3-DoF **병진**으로만 옮겼다. 자연스러운 다음 수는 **손목 회전까지** 더한 full 6-DoF 손 배치다 — 손이 물체에 맞게 자세를 잡으면 더 좋은 grasp이 나올 것 같았다. 그래서 손가락 관절 $q$ + 손 배치 $(t_{\text{off}}, r_{\text{off}})$(병진+축각 회전, 물체 중심 기준)를 함께 최적화하고, 여러 초기 손목 방향에서 multi-start로 후보를 모았다.
+
+**그런데 예상과 다른 것을 발견했다 — "무엇을 최적화하느냐"가 핵심이었다.** 회전을 자유롭게 두고 **접촉 gap을 최소화**하면 손끝이 물체에 더 바짝 붙는다(gap 14→**11mm**). 그런데 그렇게 고른 grasp은 **force-closure ε가 음수(−0.003)로 떨어져 실제로는 못 잡는다** — 손을 28° 기울여 접촉점들이 한쪽으로 몰렸기 때문이다. 반대로 같은 후보들을 **force-closure ε로 정렬**하면 gap은 조금 크지만(14mm) **ε=+0.054로 안정적으로 잡는 grasp**이 선택된다.
+
+<img src="_static/hm5e_6dof.png" alt="6-DoF grasp synthesis: ranking by gap vs by force-closure gives different grasps" style="width:100%;max-width:1280px;border-radius:8px">
+
+*좌=실제 grasp. 중=6-DoF 후보 중 **gap 최소**(가장 바짝 붙지만 ε<0, 불안정 ✘). 우=같은 후보 중 **force-closure ε 최대**(gap은 크지만 안정 ✔). 눈으로는 둘이 비슷해 보이지만 안정성은 정반대다.*
+
+| 6-DoF 후보 (8개, grasp-moment frame) | gap | force-closure ε | 손 회전 |
+|---|---|---|---|
+| **gap 최소**로 선택 (가장 바짝) | **10.9 mm** | −0.003 (**못 잡음 ✘**) | 28° |
+| **force-closure ε 최대**로 선택 | 14.4 mm | **+0.054 (안정 ✔)** | 0° |
+
+**핵심 교훈 두 가지.** ① **접촉 거리(gap)를 목적함수로 쓰면 안 된다** — 가장 바짝 붙는 grasp이 가장 불안정할 수 있다(눈으로 구분 안 됨, 오직 정량 지표 ε만이 구분). 그래서 grasp planner는 접촉 근접이 아니라 **analytic grasp metric(Ferrari–Canny 등)** 을 최적화한다. ② 이 mug·3지 grasp에서는 **손목 회전이 안정성을 높이지 못했다** — 안정 최적 grasp은 회전 0°(즉 §11.10의 병진만). 즉 **placement DoF를 늘리는 것 자체보다 "올바른 목적함수"가 더 중요**했고, grasp 품질은 결국 grasp 타입·손 kinematics에 의해 위에서 제한된다.
+
+*정직: 6-DoF가 3-DoF보다 "더 강한 grasp"을 줄 거라 기대했지만, 실제로는 회전이 gap만 줄이고 ε는 오히려 낮췄다. 이 반례가 이 트랙에서 가장 값진 교훈 중 하나 — **최적화는 "무엇을 재느냐"가 절반이다.** 손 배치를 6-DoF로 열되 반드시 grasp-quality로 골라야 한다. (arm IK로 base까지 열면 더 큰 개선 여지가 있지만, 목적함수 원칙은 동일.)*
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -577,4 +596,5 @@ python src/hot3d_scan.py 6  &&  python src/hot3d_multiobj.py  # 물체별 접촉
 MUJOCO_GL=osmesa python src/hm5b_realgrasp.py                  # §11.8 실제 grasp → Allegro 리타게팅
 MUJOCO_GL=osmesa python src/hm5c_contact_retarget.py           # §11.9 물체 접촉 제약 리타게팅(+morphology 벽)
 MUJOCO_GL=osmesa python src/hm5d_graspsyn.py                    # §11.10 grasp 합성(도달 접촉 재계획+force-closure)
+MUJOCO_GL=osmesa python src/hm5e_6dof.py                        # §11.11 6-DoF 손배치 + 목적함수(gap vs ε) 비교
 ```
