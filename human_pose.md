@@ -432,6 +432,26 @@ $$\min_{\theta,\,s,\,\mathbf t}\ \sum_{j}\Big\|\,\pi_{f}\big(s\,\hat J_j(\theta)
 
 **핵심:** 시퀀스가 바뀌어도 **PA-MPJPE 4.3±1.4mm로 일관** — 우리 MANO 피팅의 형상 복원 정확도가 특정 장면 운이 아니라 **실데이터 전반에서 4mm대로 안정적**임을 확인. root-rel은 39–64mm로 장면마다 다르지만 항상 큰데(단안 깊이 모호), 이 편차 자체가 "장면의 손-카메라 거리/자세에 따라 깊이 모호의 크기가 달라진다"는 걸 보여준다. *(P0001_4bf4e21a가 PA 6.7로 약간 높은 건 그 시퀀스에 빠른 손동작/모션블러 프레임이 섞여 GT 2D 대응이 흔들린 탓 — 프레임을 더 엄격히 거르면 내려간다.)*
 
+### 11.7 실물체 표면 접촉/침투 — HM2의 실데이터 완성판
+
+**왜 이걸 하나 (앞 단계들의 한계를 메움).** §7(HM2)은 손이 **가상 상자**를 잡을 때의 접촉/침투를 해석적 box SDF로 모델링했고, §11.5는 실물체를 다뤘지만 **6-DoF 중심 거리**까지만 봤다(표면 아님). 여기서는 마지막 한 조각 — **실제 물체의 3D mesh(CAD)** 를 놓고 손이 그 **표면**을 얼마나 파고드는지(HM2의 penetration)를 실데이터에서 잰다.
+
+**무엇을 시도했나 (CAD 조달 과정 포함).** 물체 CAD는 시퀀스 manifest엔 없었다 → projectaria의 별도 "Assets" 대신 **공개 [BOP/HuggingFace 미러](https://huggingface.co/datasets/bop-benchmark/hot3d)** 에서 `hot3d_models.zip`(137MB)을 받아, 우리 시퀀스 `metadata.json`의 **`object_bop_uids`** 로 물체를 BOP mesh에 연결했다(mug_white↔`obj_000009.ply` 등). BOP mesh는 **mm 단위**라 미터로 스케일(×0.001), 물체 **6-DoF GT로 카메라 프레임에 배치**(mug mesh가 실제 컵 위치와 정확히 겹침 — 6-DoF GT 정확도의 시각적 증거), 그다음 MANO 손 20 랜드마크에서 mesh 표면까지 **signed distance**를 계산한다:
+
+$$\text{sd}(x)=\pm\min_{y\in\partial\mathcal{M}}\lVert x-y\rVert\quad(\text{안쪽 }+,\ \text{바깥쪽 }-);\qquad \text{penetration}=\max(0,\ \text{sd}),\quad \text{contact}\Leftrightarrow |\text{sd}|<12\text{mm}$$
+
+<img src="_static/hot3d_pen.png" alt="real object mesh placed by 6-DoF + hand contact" style="width:100%;max-width:1200px;border-radius:8px">
+
+*실제 컵 위에 **BOP mug mesh(orange)를 6-DoF GT로 배치** + 손 골격. 빨간 ★ = 표면 12mm 이내로 접촉한 손끝. 엄지·검지·중지가 컵 테두리를 잡는다.*
+
+<img src="_static/hot3d_pen_plot.png" alt="hand-mug surface distance and penetration over time" style="width:100%;max-width:1100px;border-radius:8px">
+
+*위: 손끝→mug **표면** 최소거리가 ~600mm에서 접촉존(<12mm)으로 떨어져 유지, penetration은 0~2mm. 아래: 손끝별 접촉 맵 — grasp 시작(≈frame 20)부터 엄지·검지·중지가 켜진다(약지 잠깐).*
+
+**결과.** mug mesh가 실제 컵과 정확히 정렬(6-DoF GT), 손끝→표면 **최소 0.0mm**(접촉), **최대 침투 1.8mm**, 40프레임 중 **20프레임 접촉**, 잡는 순간 **엄지+검지+중지**가 테두리에 닿는다. 즉 HM2의 "접촉/침투"가 **합성 box → 실제 물체 mesh** 로 올라갔다.
+
+*정직: 침투가 1~2mm로 작은 건 (a) 실제 grasp이 표면을 거의 안 파고들고(사람 손은 물체를 살짝 쥠), (b) BOP eval mesh가 decimate·비-watertight라 signed 부호에 약간의 노이즈가 있어서다 — HM2 합성(접촉 prior 전 9.1mm 침투)과 달리 실데이터는 애초에 물리적으로 타당한 접촉이라 값이 작다. 이어짐 → 이 "어느 손끝이 물체 어디에 닿나"가 바로 **HM5 리타게팅**에서 로봇 핸드의 grasp 매핑으로 연결되는 정보다.*
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -452,4 +472,6 @@ python src/hot3d_viz.py --mano_dir <dir>/mano                  # §11.4 실프�
 python src/hot3d_hoi.py                                        # §11.5 손+물체 HOI (거리/grasp)
 # §11.6 여러 시퀀스: hot3d_download.py 1/2/3 → 각 추출 → HOT3D_SEQ/HOT3D_DUMP/HOT3D_OUT 로 dump+fit → aggregate
 python src/hot3d_aggregate.py                                  # 시퀀스별 표 + 차트
+# §11.7 실물체 표면 침투: BOP mesh(hot3d_models.zip, HF) + 6-DoF → 손-표면 SDF
+python src/hot3d_penetration.py                               # 손↔물체 표면 접촉/침투 (trimesh)
 ```
