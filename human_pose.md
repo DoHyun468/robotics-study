@@ -473,13 +473,13 @@ mug 하나로는 "이 파이프라인이 그 컵에만 되는 것 아니냐"는 
 
 ### 11.8 실제 human grasp → 로봇 핸드 리타게팅 (HM5 × 실데이터 — 트랙의 종착점)
 
-**왜 이걸 하나 (전 트랙을 하나로 잇는 마무리).** §5(HM5)는 사람 손 → Allegro 로봇 핸드 리타게팅을 했지만 입력이 **합성 MANO open→fist**였다. 이제 §11의 **실제 HOT3D 인간 grasp**(mug를 잡는 실제 손, 40프레임)을 그 리타게팅에 그대로 물려 — **perception(실 egocentric 손 pose) → action(로봇 핸드가 같은 grasp 실행)** 을 실데이터로 닫는다. 이게 JD의 "Human-to-Robot Motion Retargeting"을 실데이터로 증명하는 지점이다.
+**왜 이걸 하나 (전 트랙을 하나로 잇는 마무리).** §5(HM5)는 사람 손 → Allegro 로봇 핸드 리타게팅을 했지만 입력이 **합성 MANO open→fist**였다. 이제 §11의 **실제 HOT3D 손 궤적**(mug로 **접근→접촉**하는 40프레임)을 그 리타게팅에 그대로 물려 — **perception(실 egocentric 손 pose) → action(로봇 핸드가 손 모양을 따라감)** 을 실데이터로 잇는다. 이게 JD의 "Human-to-Robot Motion Retargeting"을 실데이터로 보이는 지점이다. *정직: 이 40프레임은 깔끔한 단일 grasp이 아니라 손이 멀리서(프레임 1–20, mug에서 60→2cm) 다가와 후반(21–40)에 접촉하는 궤적이다 — 여기서 맞추는 건 매 프레임의 **손 모양(keyvector)** 이고, 물체를 실제로 "쥐는" grasp 자체(접촉·force-closure)는 §11.9–11.12에서 다룬다.*
 
 **방법 (HM5 그대로, 입력만 실데이터).** HOT3D 21-랜드마크를 HM5의 **8 keyvector**(검지·중지·약지·엄지의 medial+tip, palm=손목)에 매핑 → 첫 프레임에서 Kabsch 정렬 + 스케일 → 프레임마다 **관절限 bound L-BFGS-B + 자기충돌 패널티 + smoothing**(§5와 동일 파이프라인). 즉 합성 궤적 자리에 **실제 사람 손 궤적**을 꽂았다.
 
 <img src="_static/hm5b_realgrasp.png" alt="real HOT3D human grasp retargeted to Allegro robot hand" style="width:100%;max-width:1280px;border-radius:8px">
 
-*위=실제 HOT3D 인간 손이 mug를 open→grasp(4프레임). 아래=리타게팅된 Allegro가 같은 open→grasp을 따라 손가락을 오므린다.*
+*위=실제 HOT3D 손이 mug로 접근(프레임 1·20)→접촉(30·40). 아래=리타게팅된 Allegro가 같은 손 모양을 따라 손가락을 오므린다.*
 
 | 지표 (실제 grasp 40프레임) | 값 |
 |---|---|
@@ -488,7 +488,7 @@ mug 하나로는 "이 파이프라인이 그 컵에만 되는 것 아니냐"는 
 | joints within limits | **100%** |
 | self-collision | **0 / 40** |
 
-**핵심:** 합성이 아니라 **실제 사람의 grasp**을 로봇 핸드가 따라 하고, 관절限·자기충돌 없이(feasible) 실행 가능한 궤적이 나온다. 잔차 65mm는 §5(합성 58mm)보다 큰데 — 실제 손은 자세 변화가 크고 **5→4 손가락 cross-morphology**가 겹쳐서다(그래서 절대위치가 아닌 keyvector를 맞춤). *이어짐: §11.7의 "어느 손끝이 물체에 닿나"(접촉맵)를 이 리타게팅의 제약으로 넣으면 로봇이 **물체까지 고려한 grasp**을 재현할 수 있다(확장 가능).* 
+**핵심:** 합성이 아니라 **실제 사람 손 궤적**을 로봇 핸드가 따라 하고, 관절限·자기충돌 없이(feasible) 실행 가능한 관절 궤적이 나온다. 잔차 65mm는 §5(합성 58mm)보다 큰데 — 실제 손은 자세 변화가 크고 **5→4 손가락 cross-morphology**가 겹쳐서다(그래서 절대위치가 아닌 keyvector를 맞춤). **여기까지는 손 모양만 맞춘 것** — 로봇 손끝이 실제 mug에 닿거나 안정적으로 쥐는지는 보장되지 않는다. *이어짐: §11.7의 "어느 손끝이 물체에 닿나"(접촉맵)를 제약으로 넣어 §11.9–11.12에서 **물체까지 고려한 grasp**으로 확장한다.* 
 
 **→ 트랙 전체가 하나로 닫힌다:** 실 egocentric 이미지(HM6) → 우리 MANO 3D 복원(§11.4, PA 3.9mm) → 실물체 접촉(§11.7) → **로봇 핸드 실행(§11.8)**. 즉 *sensor → 3D perception → contact → embodied action* 의 spatial-intelligence 파이프라인을 시뮬(HM0–HM5)에서 세우고 실데이터로 관통했다.
 
@@ -536,18 +536,24 @@ $$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert 
 
 <img src="_static/hm5d_graspsyn.png" alt="grasp synthesis: reachable contact re-planning achieves force-closure" style="width:100%;max-width:1280px;border-radius:8px">
 
-*좌=실제 human grasp(frame 25). 중=§11.9 사람 접촉 복사(손가락이 벌어져 mug를 못 쥠). 우=§11.10 손 42mm 재배치 + 도달 가능 접촉 재계획(빨간•=접촉점) → mug를 감싸 쥔다.*
+*좌=실제 human grasp(frame 25). 중=§11.9 사람 접촉 복사(손가락이 벌어져 mug를 못 쥐고 mesh를 파고듦). 우=§11.10 손 33mm 재배치 + 도달 가능 접촉 재계획(빨간•=접촉점) → 손끝이 표면 밖에서 감싼다.*
+
+```{admonition} 정직한 정정 — "관통" 버그 (2026-08-05)
+:class: warning
+이 절의 초기 버전은 **손끝 3개만** 표면에 붙이고 force-closure만 최적화했다. 그런데 **손바닥·손가락 마디가 물체를 파고드는 것(hand↔object 관통)을 목적함수가 전혀 막지 않았고**, 렌더 속 mug는 시각 전용 geom이라 물리 충돌도 없었다. 그래서 처음 보고한 **ε +0.054는 손이 mug를 ~2mm 파고들어 얻은 부풀린 값**이었다. DexGraspNet식 관통 패널티 $E_{\text{pen}}$(손 body들이 물체 안에 들어가면 벌점)을 추가해 다시 풀었다. 아래 수치는 **관통 0mm를 강제한 물리적으로 유효한** 결과다.
+```
 
 | 지표 (grasp-moment frame, 3지 precision) | §11.9 사람 접촉 복사 | §11.10 grasp 합성 |
 |---|---|---|
-| 손끝 → mug 표면 gap | 31.1 mm | **14.7 mm** |
-| force-closure $\varepsilon$ | −0.121 (**불가 ✘**) | **+0.054 (안정 ✔)** |
+| 손끝 → mug 표면 gap | 31.1 mm | **16.8 mm** |
+| force-closure $\varepsilon$ | −0.121 (**불가 ✘**) | **+0.031 (안정 ✔, 여유는 작음)** |
+| **물체 관통** | 1.7 mm | **0.0 mm** |
 | self-collision | 0 | 0 |
-| 손 재배치량 $\lVert t_{\text{off}}\rVert$ | — | 42 mm |
+| 손 재배치량 $\lVert t_{\text{off}}\rVert$ | — | 33 mm |
 
-**핵심:** 사람 접촉점을 복사하면 gap 31mm에 force-closure도 **실패**(ε<0, 못 잡음). 반면 **손을 42mm 재배치하고 접촉점을 로봇에 맞게 다시 고르면** gap이 15mm로 줄고 ε가 **양수로 바뀌어 실제로 잡을 수 있는 grasp**이 된다 — 무충돌 유지. §11.9가 증명한 벽을 §11.10이 **넘는 방법**(hand placement + contact re-planning)을 실데이터 물체에서 보여준 것이다.
+**핵심:** 사람 접촉점을 복사하면 gap 31mm·force-closure **실패**(ε −0.12)에 물체까지 파고든다. 반면 **손을 33mm 재배치하고 접촉점을 로봇에 맞게 다시 고르고 관통을 금지하면** gap 17mm·ε가 **양수(+0.031)로 바뀌어 물리적으로 유효한(관통 0mm) 잡을 수 있는 grasp**이 된다. §11.9가 증명한 벽을 §11.10이 **넘는 방법**(hand placement + contact re-planning + 비관통)을 실데이터 물체에서 보여준 것.
 
-*정직: 잔차 15mm는 3지·고정 손가락 길이·곡면 mug의 한계(완벽히 표면에 붙진 않음)지만 force-closure는 성립한다. 여기선 손 배치를 3-DoF 병진으로만 근사했다(회전·arm IK 추가하면 더 개선). 이것이 GraspIt·DexGraspNet·contact-GraspNet 계열 grasp 합성의 축소판이다.*
+*정직: ε +0.031은 **양수지만 여유가 작다** — force-closure 경계 바로 위의 marginal grasp이다(관통을 허용했을 때의 +0.054는 허수였다). 잔차 gap 17mm는 3지·고정 손가락 길이·곡면 mug의 한계. 손 배치는 3-DoF 병진 근사(§11.11에서 회전까지, §11.12에서 arm IK). 이것이 GraspIt·DexGraspNet·contact-GraspNet 계열 grasp 합성의 축소판이다.*
 
 **→ 트랙의 완결:** HM5(합성 retarget) → §11.8(실 grasp retarget) → §11.9(접촉 제약 + 벽 발견) → **§11.10(grasp 합성으로 벽 돌파)**. perception→action이 다른 morphology로 넘어갈 때 필요한 것 — 3D 인식, 접촉 이해, 도달성·안정성 최적화 — 을 실데이터로 관통했다.
 
@@ -555,18 +561,18 @@ $$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert 
 
 **왜 이걸 하나 (§11.10을 더 밀어보기).** §11.10은 손을 3-DoF **병진**으로만 옮겼다. 자연스러운 다음 수는 **손목 회전까지** 더한 full 6-DoF 손 배치다 — 손이 물체에 맞게 자세를 잡으면 더 좋은 grasp이 나올 것 같았다. 그래서 손가락 관절 $q$ + 손 배치 $(t_{\text{off}}, r_{\text{off}})$(병진+축각 회전, 물체 중심 기준)를 함께 최적화하고, 여러 초기 손목 방향에서 multi-start로 후보를 모았다.
 
-**그런데 예상과 다른 것을 발견했다 — "무엇을 최적화하느냐"가 핵심이었다.** 회전을 자유롭게 두고 **접촉 gap을 최소화**하면 손끝이 물체에 더 바짝 붙는다(gap 14→**11mm**). 그런데 그렇게 고른 grasp은 **force-closure ε가 음수(−0.003)로 떨어져 실제로는 못 잡는다** — 손을 28° 기울여 접촉점들이 한쪽으로 몰렸기 때문이다. 반대로 같은 후보들을 **force-closure ε로 정렬**하면 gap은 조금 크지만(14mm) **ε=+0.054로 안정적으로 잡는 grasp**이 선택된다.
+**발견 — "무엇을 최적화하느냐"가 핵심이었다** (모든 후보는 관통 0mm 강제). 회전을 자유롭게 두고 **접촉 gap을 최소화**하면 손끝이 더 바짝 붙지만(gap 14mm) force-closure 여유가 작다(ε +0.013). 같은 후보를 **force-closure ε로 정렬**하면 gap은 조금 크지만(17mm) **ε +0.031로 2.3배 더 안정적인 grasp**이 선택된다. 즉 가장 바짝 붙는 게 가장 안정적인 게 아니다.
 
 <img src="_static/hm5e_6dof.png" alt="6-DoF grasp synthesis: ranking by gap vs by force-closure gives different grasps" style="width:100%;max-width:1280px;border-radius:8px">
 
-*좌=실제 grasp. 중=6-DoF 후보 중 **gap 최소**(가장 바짝 붙지만 ε<0, 불안정 ✘). 우=같은 후보 중 **force-closure ε 최대**(gap은 크지만 안정 ✔). 눈으로는 둘이 비슷해 보이지만 안정성은 정반대다.*
+*좌=실제 grasp. 중=6-DoF 후보 중 **gap 최소**(가장 바짝, 안정 여유 작음). 우=같은 후보 중 **force-closure ε 최대**(gap은 크지만 가장 안정). 둘 다 관통 0mm·force-closure ✔지만 안정 여유는 우측이 2.3배.*
 
-| 6-DoF 후보 (8개, grasp-moment frame) | gap | force-closure ε | 손 회전 |
+| 6-DoF 후보 (8개, 관통 0mm, grasp-moment frame) | gap | force-closure ε | 손 회전 |
 |---|---|---|---|
-| **gap 최소**로 선택 (가장 바짝) | **10.9 mm** | −0.003 (**못 잡음 ✘**) | 28° |
-| **force-closure ε 최대**로 선택 | 14.4 mm | **+0.054 (안정 ✔)** | 0° |
+| **gap 최소**로 선택 (가장 바짝) | **14.3 mm** | +0.013 (✔, 여유 작음) | 15° |
+| **force-closure ε 최대**로 선택 | 16.8 mm | **+0.031 (✔, 가장 안정)** | 0° |
 
-**핵심 교훈 두 가지.** ① **접촉 거리(gap)를 목적함수로 쓰면 안 된다** — 가장 바짝 붙는 grasp이 가장 불안정할 수 있다(눈으로 구분 안 됨, 오직 정량 지표 ε만이 구분). 그래서 grasp planner는 접촉 근접이 아니라 **analytic grasp metric(Ferrari–Canny 등)** 을 최적화한다. ② 이 mug·3지 grasp에서는 **손목 회전이 안정성을 높이지 못했다** — 안정 최적 grasp은 회전 0°(즉 §11.10의 병진만). 즉 **placement DoF를 늘리는 것 자체보다 "올바른 목적함수"가 더 중요**했고, grasp 품질은 결국 grasp 타입·손 kinematics에 의해 위에서 제한된다.
+**핵심 교훈 두 가지.** ① **접촉 거리(gap)를 목적함수로 쓰면 안 된다** — 가장 바짝 붙는 grasp이 안정성이 더 낮을 수 있다(눈으로 구분 안 됨, 오직 ε만이 구분). 그래서 grasp planner는 접촉 근접이 아니라 **analytic grasp metric(Ferrari–Canny 등)** 을 최적화한다. ② 이 mug·3지 grasp에서는 **손목 회전이 안정성을 높이지 못했다** — 최고 ε는 회전 0°(즉 §11.10의 병진만). 즉 **placement DoF를 늘리는 것 자체보다 "올바른 목적함수"가 더 중요**했고, grasp 품질(ε≈+0.03, marginal)은 결국 grasp 타입·손 kinematics·물체 크기에 의해 위에서 제한된다.
 
 *정직: 6-DoF가 3-DoF보다 "더 강한 grasp"을 줄 거라 기대했지만, 실제로는 회전이 gap만 줄이고 ε는 오히려 낮췄다. 이 반례가 이 트랙에서 가장 값진 교훈 중 하나 — **최적화는 "무엇을 재느냐"가 절반이다.** 손 배치를 6-DoF로 열되 반드시 grasp-quality로 골라야 한다. (arm IK로 base까지 열면 더 큰 개선 여지가 있지만, 목적함수 원칙은 동일.)*
 
@@ -591,7 +597,7 @@ $$e=\begin{bmatrix} x^\star_{\text{pos}}-x_{\text{pos}}\\[2pt] \log\!\big(R^\sta
 | IK 위치 잔차 | **≈ 0.0 mm** (254mm에서 수렴) |
 | IK 자세 잔차 | **0.0°** |
 | 팔 within joint limits | **100%** |
-| 실행된 grasp | gap 14.4mm · force-closure ε +0.054 ✔ |
+| 실행된 grasp | gap 16.8mm · force-closure ε +0.031 ✔ · **물체 관통 0.0mm** |
 
 **핵심:** 7-DoF DLS IK가 팔 관절을 움직여 손바닥을 grasp 목표 자세에 **잔차 0**으로 가져다 놓고(관절限 100% 준수), 그 상태에서 손가락이 §11.11 grasp을 실행해 mug를 **force-closure로 쥔다.** 즉 §11.9에서 발견한 "손바닥 고정" 벽이 **실제 팔로 완전히 사라진다** — 팔이 손을 어디로든 가져갈 수 있으므로.
 
