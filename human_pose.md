@@ -471,6 +471,27 @@ mug 하나로는 "이 파이프라인이 그 컵에만 되는 것 아니냐"는 
 
 **핵심:** 물체 mesh가 6종 모두 실제 물체와 정확히 겹치고(6-DoF GT), **접촉 패턴이 기하를 반영** — 컵 손잡이는 2~4지 pinch, 아령 손잡이는 4지 wrap, 폰은 판을 쥐는 3지, **keyboard는 접촉(0)이 아니라 13mm 위에서 hover**(누르는 자세지 잡는 게 아님). 즉 HM2의 접촉/침투가 **물체 종류에 무관하게 일반화**된다. *정직: mouse가 침투 11mm로 큰 건 손이 작은 마우스를 감싸며 손바닥 쪽 점들이 마우스 볼륨 안으로 들어가서다(소형 물체 + 감싸쥠의 특성; eval mesh 부호 노이즈도 일부). 물체별 mesh 품질/pose 정확도에 따라 값이 달라지는 것도 그대로 드러난다.*
 
+### 11.8 실제 human grasp → 로봇 핸드 리타게팅 (HM5 × 실데이터 — 트랙의 종착점)
+
+**왜 이걸 하나 (전 트랙을 하나로 잇는 마무리).** §5(HM5)는 사람 손 → Allegro 로봇 핸드 리타게팅을 했지만 입력이 **합성 MANO open→fist**였다. 이제 §11의 **실제 HOT3D 인간 grasp**(mug를 잡는 실제 손, 40프레임)을 그 리타게팅에 그대로 물려 — **perception(실 egocentric 손 pose) → action(로봇 핸드가 같은 grasp 실행)** 을 실데이터로 닫는다. 이게 JD의 "Human-to-Robot Motion Retargeting"을 실데이터로 증명하는 지점이다.
+
+**방법 (HM5 그대로, 입력만 실데이터).** HOT3D 21-랜드마크를 HM5의 **8 keyvector**(검지·중지·약지·엄지의 medial+tip, palm=손목)에 매핑 → 첫 프레임에서 Kabsch 정렬 + 스케일 → 프레임마다 **관절限 bound L-BFGS-B + 자기충돌 패널티 + smoothing**(§5와 동일 파이프라인). 즉 합성 궤적 자리에 **실제 사람 손 궤적**을 꽂았다.
+
+<img src="_static/hm5b_realgrasp.png" alt="real HOT3D human grasp retargeted to Allegro robot hand" style="width:100%;max-width:1280px;border-radius:8px">
+
+*위=실제 HOT3D 인간 손이 mug를 open→grasp(4프레임). 아래=리타게팅된 Allegro가 같은 open→grasp을 따라 손가락을 오므린다.*
+
+| 지표 (실제 grasp 40프레임) | 값 |
+|---|---|
+| human→robot 스케일 | 0.76 |
+| keyvector 매칭 | **65.0 mm** |
+| joints within limits | **100%** |
+| self-collision | **0 / 40** |
+
+**핵심:** 합성이 아니라 **실제 사람의 grasp**을 로봇 핸드가 따라 하고, 관절限·자기충돌 없이(feasible) 실행 가능한 궤적이 나온다. 잔차 65mm는 §5(합성 58mm)보다 큰데 — 실제 손은 자세 변화가 크고 **5→4 손가락 cross-morphology**가 겹쳐서다(그래서 절대위치가 아닌 keyvector를 맞춤). *이어짐: §11.7의 "어느 손끝이 물체에 닿나"(접촉맵)를 이 리타게팅의 제약으로 넣으면 로봇이 **물체까지 고려한 grasp**을 재현할 수 있다(확장 가능).* 
+
+**→ 트랙 전체가 하나로 닫힌다:** 실 egocentric 이미지(HM6) → 우리 MANO 3D 복원(§11.4, PA 3.9mm) → 실물체 접촉(§11.7) → **로봇 핸드 실행(§11.8)**. 즉 *sensor → 3D perception → contact → embodied action* 의 spatial-intelligence 파이프라인을 시뮬(HM0–HM5)에서 세우고 실데이터로 관통했다.
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -494,4 +515,5 @@ python src/hot3d_aggregate.py                                  # 시퀀스별 �
 # §11.7 실물체 표면 침투: BOP mesh(hot3d_models.zip, HF) + 6-DoF → 손-표면 SDF
 python src/hot3d_penetration.py                               # 손↔물체 표면 접촉/침투 (trimesh)
 python src/hot3d_scan.py 6  &&  python src/hot3d_multiobj.py  # 물체별 접촉 프레임 스캔 → 6종 표면 침투
+MUJOCO_GL=osmesa python src/hm5b_realgrasp.py                  # §11.8 실제 grasp → Allegro 리타게팅
 ```
