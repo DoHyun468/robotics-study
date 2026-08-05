@@ -492,6 +492,36 @@ mug 하나로는 "이 파이프라인이 그 컵에만 되는 것 아니냐"는 
 
 **→ 트랙 전체가 하나로 닫힌다:** 실 egocentric 이미지(HM6) → 우리 MANO 3D 복원(§11.4, PA 3.9mm) → 실물체 접촉(§11.7) → **로봇 핸드 실행(§11.8)**. 즉 *sensor → 3D perception → contact → embodied action* 의 spatial-intelligence 파이프라인을 시뮬(HM0–HM5)에서 세우고 실데이터로 관통했다.
 
+### 11.9 물체를 고려한(contact-aware) 리타게팅 — 그리고 morphology의 벽
+
+**왜 이걸 하나 (§11.8의 빈틈).** §11.8은 사람 손의 **모양(keyvector)** 만 맞췄다 — 로봇이 손을 흉내낼 뿐, **물체는 최적화에 들어가 있지 않다.** 그래서 로봇 손끝이 실제 mug에 닿는다는 보장이 없다. §11.7에서 우리는 어느 사람 손끝이 실제 mug 표면에 닿는지(6-DoF GT로 놓인 BOP mesh 기준)를 이미 측정했다. 여기서 그 접촉 정보를 **리타게팅의 제약**으로 넣어, 로봇 손끝이 실제 물체 표면에 **직접 착지**하도록 만들어본다.
+
+**방법 (수식).** §11.7에서 접촉으로 판정된 손가락 집합 $\mathcal{C}$(엄지+가장 가까운 손가락 = pinch 2지)에 대해, 사람 손끝을 로봇 프레임으로 보낸 뒤 mug 표면의 **최근접점 + 바깥 법선**으로 접촉 앵커 $a_f$를 만든다(손끝 capsule 반지름 $r{=}12$mm만큼 밖으로 offset → capsule 표면이 물체 표면에 닿음). 그 앵커로 손끝을 당기는 항을 §11.8 목적함수에 더한다:
+
+$$\min_{q}\; \underbrace{\sum_i \lVert v^{\text{robot}}_i(q) - sR\,v^{\text{human}}_i\rVert^2}_{\text{keyvector(손 모양)}} \;+\; w_{\text{con}}\!\!\sum_{f\in\mathcal{C}}\lVert \text{tip}_f(q) - a_f\rVert^2 \;+\; w_{\text{col}}\,\text{pen}(q)^2 \quad \text{s.t. } q\in[q_{lo},q_{hi}]$$
+
+물체 mesh를 로봇 프레임으로 옮기는 사상은 리타게팅과 **동일한 similarity**다(사람 손목 ↔ 로봇 palm): $p_{\text{robot}} = R_{\text{align}}\,(s\,(p_{\text{cam}} - \text{wrist}_{\text{cam}}))$. 손끝 위치는 Allegro `*_tip` body의 **fingertip collision capsule 중심**을 FK로 뽑아 쓴다(관절 원점이 아니라 실제 접촉면).
+
+<img src="_static/hm5c_contact.png" alt="contact-aware retargeting: Allegro fingertips reaching the real mug surface" style="width:100%;max-width:1280px;border-radius:8px">
+
+*위=실제 grasp에 6-DoF GT로 놓인 mug mesh(주황) + 손 skeleton, 빨간 ★=물체에 닿는 손끝. 아래=contact-aware Allegro가 같은 mug(주황)를 실제로 쥔 모습(MuJoCo에서 손+물체를 함께 렌더).*
+
+**결과 — 그리고 정직한 벽.**
+
+| 지표 (접촉 손가락, 40 grasp 프레임) | keyvector만 (§11.8) | contact-aware (§11.9) |
+|---|---|---|
+| 손끝 capsule → mug 표면 gap | 35.4 mm | **31.0 mm** |
+| 물체 침투(pen) | 0.0 mm | 5.7 mm |
+| keyvector 매칭 | 65.4 mm | 64.0 mm |
+| within joint limits | 100% | 100% |
+| self-collision | 0 / 40 | 8 / 40 |
+
+접촉 항이 pinch 손가락을 mug 쪽으로 당겨 gap이 줄긴 한다(35→31mm). **그런데 여기서 결정적인 발견:** 접촉 가중치 $w_{\text{con}}$을 800→2000→5000으로 아무리 키워도 gap은 **31.6mm에서 꿈쩍하지 않는다.** 이건 튜닝 실패가 아니라 **물리적 벽**이다 — 4손가락 Allegro는, 사람 손 크기로 스케일된 mug 위에서 5손가락 사람이 닿은 그 지점들에 손끝을 **동시에 놓을 수 없다**(손가락 수·길이·엄지 opposition 범위가 다르고, palm 기준 배치가 로봇 도달 영역을 벗어남). 무리하게 당기면 self-collision(0→8)과 물체 침투(5.7mm)만 늘어난다.
+
+**핵심 교훈 (이게 진짜 배운 것):** perception→action을 **다른 morphology로 옮기는 건 retargeting + 접촉항으로 끝나지 않는다.** 사람의 접촉점을 그대로 복사하는 대신, **로봇이 실제로 도달 가능한 접촉점을 물체 위에서 다시 고르는 grasp 재계획(object-aware grasp synthesis)** 이 필요하다 — 이것이 DexGraspNet·contact-GraspNet 같은 grasp 합성 연구가 존재하는 이유다. 즉 §11.8이 "따라 하기"의 한계를 보여주고, §11.9가 **그 한계의 정체(morphology gap)를 정량적으로(가중치 불변 31mm 벽) 증명**한다.
+
+*이어짐: 다음 단계는 접촉점을 고정하지 않고 "로봇 도달 가능 + 힘 안정(force-closure) + 무충돌"을 함께 푸는 grasp 합성 — 그러면 사람 grasp은 grasp **타입**(어느 손가락, 어느 면)만 주고, 실제 접촉점은 로봇 손에 맞게 재배치된다.*
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -516,4 +546,5 @@ python src/hot3d_aggregate.py                                  # 시퀀스별 �
 python src/hot3d_penetration.py                               # 손↔물체 표면 접촉/침투 (trimesh)
 python src/hot3d_scan.py 6  &&  python src/hot3d_multiobj.py  # 물체별 접촉 프레임 스캔 → 6종 표면 침투
 MUJOCO_GL=osmesa python src/hm5b_realgrasp.py                  # §11.8 실제 grasp → Allegro 리타게팅
+MUJOCO_GL=osmesa python src/hm5c_contact_retarget.py           # §11.9 물체 접촉 제약 리타게팅(+morphology 벽)
 ```
