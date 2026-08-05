@@ -570,6 +570,37 @@ $$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert 
 
 *정직: 6-DoF가 3-DoF보다 "더 강한 grasp"을 줄 거라 기대했지만, 실제로는 회전이 gap만 줄이고 ε는 오히려 낮췄다. 이 반례가 이 트랙에서 가장 값진 교훈 중 하나 — **최적화는 "무엇을 재느냐"가 절반이다.** 손 배치를 6-DoF로 열되 반드시 grasp-quality로 골라야 한다. (arm IK로 base까지 열면 더 큰 개선 여지가 있지만, 목적함수 원칙은 동일.)*
 
+### 11.12 팔에 얹기 — arm Inverse Kinematics로 파이프라인을 끝까지 (end-to-end)
+
+**왜 이걸 하나 (실제 로봇으로 실행).** §11.8–11.11의 grasp은 전부 **손바닥이 고정된 Allegro**에 대한 것이었다. 실제 로봇은 그 손을 **팔(arm)** 끝에 단다. 그래서 grasp을 실행한다는 건: 합성된 grasp이 요구하는 **손바닥 6-DoF 목표 자세 $x^\star$** 에 팔이 손바닥을 가져다 놓는 것 — 즉 **역기구학(Inverse Kinematics)** 을 푸는 것이다. FK(관절→손 위치)는 쉽지만 IK(손 위치→관절)는 비선형 역문제라 반복으로 푼다.
+
+**구성.** MuJoCo menagerie의 **Franka Panda 7-DoF 팔**과 **Allegro 손**을 (별도 배포라) XML을 합쳐 팔 flange에 손을 grafting한 **합성 로봇**을 만들고, mug를 팔 작업영역 안 테이블 위에 놓았다. grasp은 강체이고 **force-closure는 전역 강체변환에 불변**이므로, §11.11 grasp을 품질 손상 없이 도달 가능한 위치로 통째로 옮길 수 있다.
+
+**방법 (damped least squares IK).** 손바닥 body의 해석적 야코비안 $J=[J_p;J_r]\in\mathbb{R}^{6\times7}$을 MuJoCo에서 얻어, 위치·자세 오차 $e$를 6D로 두고 감쇠 최소자승으로 관절 증분을 반복한다:
+
+$$e=\begin{bmatrix} x^\star_{\text{pos}}-x_{\text{pos}}\\[2pt] \log\!\big(R^\star R^{\top}\big)\end{bmatrix},\qquad \Delta q = J^{\top}\big(JJ^{\top}+\lambda^2 I\big)^{-1} e,\qquad q \leftarrow \text{clip}\big(q+\alpha\,\Delta q,\ q_{\text{lo}}, q_{\text{hi}}\big)$$
+
+($\lambda$ 감쇠항이 특이점(singularity) 근처에서 해를 안정화한다.) 팔이 $x^\star$에 도달하면 **손가락을 §11.11 grasp으로 닫는다.**
+
+<img src="_static/hm5f_armik.png" alt="arm IK mounting the synthesized grasp on a Franka arm, end-to-end" style="width:100%;max-width:1280px;border-radius:8px">
+
+*좌=Franka 7-DoF 팔 + Allegro가 테이블 위 mug로 내려가 grasp 자세 도달(IK). 중=실행된 grasp 근접(빨간•=접촉점, force-closure ✔). 우=DLS IK 수렴 곡선 — 위치 오차 254mm→0.*
+
+| 지표 | 값 |
+|---|---|
+| IK 위치 잔차 | **≈ 0.0 mm** (254mm에서 수렴) |
+| IK 자세 잔차 | **0.0°** |
+| 팔 within joint limits | **100%** |
+| 실행된 grasp | gap 14.4mm · force-closure ε +0.054 ✔ |
+
+**핵심:** 7-DoF DLS IK가 팔 관절을 움직여 손바닥을 grasp 목표 자세에 **잔차 0**으로 가져다 놓고(관절限 100% 준수), 그 상태에서 손가락이 §11.11 grasp을 실행해 mug를 **force-closure로 쥔다.** 즉 §11.9에서 발견한 "손바닥 고정" 벽이 **실제 팔로 완전히 사라진다** — 팔이 손을 어디로든 가져갈 수 있으므로.
+
+**→ 파이프라인 완주 (end-to-end):**
+
+$$\underbrace{\text{실 egocentric 이미지}}_{\text{HM6}} \to \underbrace{\text{MANO 3D 복원}}_{\S11.4,\ \text{PA }3.9\text{mm}} \to \underbrace{\text{실물체 접촉}}_{\S11.7} \to \underbrace{\text{grasp 합성}}_{\S11.10\text{–}11.11} \to \underbrace{\text{arm IK 실행}}_{\S11.12}$$
+
+*sensor → 3D perception → contact → grasp planning → **embodied action(팔+손)*** 이 실데이터에서 로봇 실행까지 한 줄로 이어졌다. 이게 CMES의 pose-to-guidance·RLWRLD의 manipulation이 실제로 밟는 경로 그대로다. *정직: IK는 손바닥 목표에 도달하는 정적 해이고, 실전엔 **무충돌 경로계획(motion planning)** + 힘제어 + 실물 캘리브레이션이 더 붙는다 — 그건 다음 트랙의 몫.*
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -597,4 +628,5 @@ MUJOCO_GL=osmesa python src/hm5b_realgrasp.py                  # §11.8 실제 g
 MUJOCO_GL=osmesa python src/hm5c_contact_retarget.py           # §11.9 물체 접촉 제약 리타게팅(+morphology 벽)
 MUJOCO_GL=osmesa python src/hm5d_graspsyn.py                    # §11.10 grasp 합성(도달 접촉 재계획+force-closure)
 MUJOCO_GL=osmesa python src/hm5e_6dof.py                        # §11.11 6-DoF 손배치 + 목적함수(gap vs ε) 비교
+MUJOCO_GL=osmesa python src/hm5f_armik.py                       # §11.12 Franka+Allegro 합성 + arm IK 실행
 ```
