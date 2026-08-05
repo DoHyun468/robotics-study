@@ -452,6 +452,25 @@ $$\text{sd}(x)=\pm\min_{y\in\partial\mathcal{M}}\lVert x-y\rVert\quad(\text{안�
 
 *정직: 침투가 1~2mm로 작은 건 (a) 실제 grasp이 표면을 거의 안 파고들고(사람 손은 물체를 살짝 쥠), (b) BOP eval mesh가 decimate·비-watertight라 signed 부호에 약간의 노이즈가 있어서다 — HM2 합성(접촉 prior 전 9.1mm 침투)과 달리 실데이터는 애초에 물리적으로 타당한 접촉이라 값이 작다. 이어짐 → 이 "어느 손끝이 물체 어디에 닿나"가 바로 **HM5 리타게팅**에서 로봇 핸드의 grasp 매핑으로 연결되는 정보다.*
 
+#### 여러 물체 기하로 일반화 (6종)
+
+mug 하나로는 "이 파이프라인이 그 컵에만 되는 것 아니냐"는 의심이 남는다. 그래서 시퀀스 전체를 스캔해 **각 물체가 손에 가장 가까워지는 프레임**을 찾고(전 물체가 실제로 조작됨 — keyboard 1.6·mouse 1.9·dumbbell 2.0·mug_patterned 2.4·cellphone 2.7·mug_white 5.4 cm), 그 프레임에서 해당 물체 mesh로 표면 접촉/침투를 냈다. **원통(mug)·평면(keyboard)·소형(mouse)·판형(cellphone)·아령(dumbbell)** 등 완전히 다른 기하에서 검증.
+
+<img src="_static/hot3d_multiobj.png" alt="real surface contact across 6 object geometries" style="width:100%;max-width:1280px;border-radius:8px">
+
+<img src="_static/hot3d_multiobj_bar.png" alt="per-object surface distance and penetration" style="width:100%;max-width:1000px;border-radius:8px">
+
+| 물체 | 기하 | 최소 표면거리 | 침투 | 접촉 손끝 |
+|---|---|---|---|---|
+| mug_white | 원통 | 0.5mm | 0 | 엄지·검지 |
+| mug_patterned | 원통 | 4.6mm | 0 | 엄지·검지·중지·약지 |
+| cellphone | 판형 | 1.3mm | 0 | 엄지·검지·약지 |
+| dumbbell_5lb | 아령 | 0.7mm | 0 | 검지·중지·약지·새끼 |
+| mouse | 소형 곡면 | 1.5mm | 11.3mm | 엄지·검지·중지 |
+| keyboard | 대형 평면 | 13.2mm | 0 | (hover) |
+
+**핵심:** 물체 mesh가 6종 모두 실제 물체와 정확히 겹치고(6-DoF GT), **접촉 패턴이 기하를 반영** — 컵 손잡이는 2~4지 pinch, 아령 손잡이는 4지 wrap, 폰은 판을 쥐는 3지, **keyboard는 접촉(0)이 아니라 13mm 위에서 hover**(누르는 자세지 잡는 게 아님). 즉 HM2의 접촉/침투가 **물체 종류에 무관하게 일반화**된다. *정직: mouse가 침투 11mm로 큰 건 손이 작은 마우스를 감싸며 손바닥 쪽 점들이 마우스 볼륨 안으로 들어가서다(소형 물체 + 감싸쥠의 특성; eval mesh 부호 노이즈도 일부). 물체별 mesh 품질/pose 정확도에 따라 값이 달라지는 것도 그대로 드러난다.*
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -474,4 +493,5 @@ python src/hot3d_hoi.py                                        # §11.5 손+물�
 python src/hot3d_aggregate.py                                  # 시퀀스별 표 + 차트
 # §11.7 실물체 표면 침투: BOP mesh(hot3d_models.zip, HF) + 6-DoF → 손-표면 SDF
 python src/hot3d_penetration.py                               # 손↔물체 표면 접촉/침투 (trimesh)
+python src/hot3d_scan.py 6  &&  python src/hot3d_multiobj.py  # 물체별 접촉 프레임 스캔 → 6종 표면 침투
 ```
