@@ -522,6 +522,35 @@ $$\min_{q}\; \underbrace{\sum_i \lVert v^{\text{robot}}_i(q) - sR\,v^{\text{huma
 
 *이어짐: 다음 단계는 접촉점을 고정하지 않고 "로봇 도달 가능 + 힘 안정(force-closure) + 무충돌"을 함께 푸는 grasp 합성 — 그러면 사람 grasp은 grasp **타입**(어느 손가락, 어느 면)만 주고, 실제 접촉점은 로봇 손에 맞게 재배치된다.*
 
+### 11.10 grasp 합성 — morphology 벽을 넘다 (도달 가능 접촉 재계획 + force-closure)
+
+**왜 이걸 하나 (§11.9의 벽을 실제로 넘기).** §11.9는 사람 접촉점을 **복사**해서 31mm 벽에 막혔다. 진짜 해법은 grasp 연구가 하는 것 — 사람 접촉점을 버리고, **로봇이 도달 가능한 접촉점을 물체 위에서 다시 고르고**, 그 결과가 **잡을 수 있는(force-closure) grasp인지 정량 검증**하는 것이다. 사람 grasp은 grasp **타입**(어느 손가락 = 검지·중지·엄지 3지 precision, 대략 어느 면)만 알려준다.
+
+**핵심 진단 — 벽의 진짜 정체.** §11.8–11.9의 Allegro는 **손바닥(base)이 고정**되어 있고 16개 손가락 관절만 움직인다. 사람 손목 기준으로 놓인 mug가 손가락 도달 영역 밖에 있으면, **어떤 관절 조합으로도 닿을 수 없다.** 즉 벽의 절반은 접촉점 문제가 아니라 **hand placement(손 위치) 문제**다 — 물체를 grasp 영역 안으로 가져오려면 **손 자체를 움직여야(arm/wrist)** 한다.
+
+**방법 (수식).** 그래서 손가락 관절 $q$와 **손-배치 오프셋** $t_{\text{off}}$(로봇 프레임에서 물체를 얼마나 당겨와야 하는가 = 손이 움직여야 하는 양)를 **함께** 최적화한다. alternating projection으로 매 라운드 손끝을 **현재 도달 가능한 최근접 표면점**으로 재투영(§11.9의 고정 앵커와 달리 앵커가 **움직인다**):
+
+$$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert \text{tip}_f(q) - (c_f + t_{\text{off}} + r\hat n_f)\big\rVert^2 + w_{\text{col}}\,\text{pen}(q)^2 + w_{\text{reg}}\lVert q-q_{\text{ref}}\rVert^2 + w_{t}\lVert t_{\text{off}}\rVert^2$$
+
+그 다음 수렴한 grasp의 **Ferrari–Canny force-closure 품질 $\varepsilon$** 을 잰다 — 각 접촉의 마찰콘($\mu{=}0.6$, 6-edge 선형화) wrench들의 볼록껍질(6D) 안에 원점을 감싸는 최대 공(ball)의 반지름. $\varepsilon>0$이면 **임의의 외력을 버틸 수 있는 안정 grasp(force-closure)**, $\varepsilon\le0$이면 불안정.
+
+<img src="_static/hm5d_graspsyn.png" alt="grasp synthesis: reachable contact re-planning achieves force-closure" style="width:100%;max-width:1280px;border-radius:8px">
+
+*좌=실제 human grasp(frame 25). 중=§11.9 사람 접촉 복사(손가락이 벌어져 mug를 못 쥠). 우=§11.10 손 42mm 재배치 + 도달 가능 접촉 재계획(빨간•=접촉점) → mug를 감싸 쥔다.*
+
+| 지표 (grasp-moment frame, 3지 precision) | §11.9 사람 접촉 복사 | §11.10 grasp 합성 |
+|---|---|---|
+| 손끝 → mug 표면 gap | 31.1 mm | **14.7 mm** |
+| force-closure $\varepsilon$ | −0.121 (**불가 ✘**) | **+0.054 (안정 ✔)** |
+| self-collision | 0 | 0 |
+| 손 재배치량 $\lVert t_{\text{off}}\rVert$ | — | 42 mm |
+
+**핵심:** 사람 접촉점을 복사하면 gap 31mm에 force-closure도 **실패**(ε<0, 못 잡음). 반면 **손을 42mm 재배치하고 접촉점을 로봇에 맞게 다시 고르면** gap이 15mm로 줄고 ε가 **양수로 바뀌어 실제로 잡을 수 있는 grasp**이 된다 — 무충돌 유지. §11.9가 증명한 벽을 §11.10이 **넘는 방법**(hand placement + contact re-planning)을 실데이터 물체에서 보여준 것이다.
+
+*정직: 잔차 15mm는 3지·고정 손가락 길이·곡면 mug의 한계(완벽히 표면에 붙진 않음)지만 force-closure는 성립한다. 여기선 손 배치를 3-DoF 병진으로만 근사했다(회전·arm IK 추가하면 더 개선). 이것이 GraspIt·DexGraspNet·contact-GraspNet 계열 grasp 합성의 축소판이다.*
+
+**→ 트랙의 완결:** HM5(합성 retarget) → §11.8(실 grasp retarget) → §11.9(접촉 제약 + 벽 발견) → **§11.10(grasp 합성으로 벽 돌파)**. perception→action이 다른 morphology로 넘어갈 때 필요한 것 — 3D 인식, 접촉 이해, 도달성·안정성 최적화 — 을 실데이터로 관통했다.
+
 ## 재현
 ```bash
 # SMPL+H 모델(license 등록 다운로드)을 <dir>/smplh/SMPLH_MALE.pkl에 두고:
@@ -547,4 +576,5 @@ python src/hot3d_penetration.py                               # 손↔물체 표
 python src/hot3d_scan.py 6  &&  python src/hot3d_multiobj.py  # 물체별 접촉 프레임 스캔 → 6종 표면 침투
 MUJOCO_GL=osmesa python src/hm5b_realgrasp.py                  # §11.8 실제 grasp → Allegro 리타게팅
 MUJOCO_GL=osmesa python src/hm5c_contact_retarget.py           # §11.9 물체 접촉 제약 리타게팅(+morphology 벽)
+MUJOCO_GL=osmesa python src/hm5d_graspsyn.py                    # §11.10 grasp 합성(도달 접촉 재계획+force-closure)
 ```
