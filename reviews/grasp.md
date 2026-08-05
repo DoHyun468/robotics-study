@@ -4,6 +4,8 @@
 
 - [GraspNet-1B (2020)](graspnet.md) — 6-DoF grasp 검출의 기준선(PointNet++ → ApproachNet/OperationNet/ToleranceNet). Windows/WSL에서 CUDA 컴파일·통합.
 - [ZeroGrasp (2025)](zerograsp.md) — object-centric reconstruction 기반 SOTA. open-tray A/B에서 학습 grasp 1위(단 GT mask 사용).
+- [Contact-GraspNet (2021)](contact-graspnet.md) — 접촉점을 **관측 표면 점에 고정**해 6-DoF grasp을 저차원화. 우리 [§11.9–11.10 접촉 앵커링](../human_pose.md)과 같은 발상의 평행-그리퍼 학습판.
+- [DexGraspNet (2023)](dexgraspnet.md) — **미분가능 force-closure 에너지**로 다지 grasp 대량 합성(132만 grasp). 우리 [§11.10–11.12 grasp 합성](../human_pose.md)의 대규모 정공법 버전.
 
 ## 우리 실측 비교 (6물체 · 5 seed · 평균 clearance)
 

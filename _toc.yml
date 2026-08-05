@@ -27,6 +27,8 @@ parts:
         sections:
           - file: reviews/graspnet
           - file: reviews/zerograsp
+          - file: reviews/contact-graspnet
+          - file: reviews/dexgraspnet
       - file: reviews/vla
         sections:
           - file: reviews/openvla
