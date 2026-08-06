@@ -9,6 +9,10 @@ parts:
     chapters:
       - file: slam
       - file: slam_math
+  - caption: World Models · hands-on
+    chapters:
+      - file: wm
+      - file: wm_math
   - caption: Learned Grasping & Policies
     chapters:
       - file: grasp_sota
