@@ -21,8 +21,8 @@
 
 ## 논문 리뷰 (Paper Reviews 파트)
 
-- [Ray(Generic) Calibration 계보](../reviews/ray-calibration.md) — Grossberg & Nayar 2001 → Sturm & Ramalingam 2004 → Schöps et al. CVPR 2020. **"모델 가정을 관측으로 대체한다"** — 석사 과제에서 모니터 기반 ray calibration으로 내부 파라미터를 고도화한 이유.
-- [1D 타깃 캘리브레이션](../reviews/1d-calibration.md) — Zhang, TPAMI 2004. 현장에서 화이트보드 대신 막대 하나로 외부 캘리브레이션이 가능한 이론적 근거.
+- [Vision Ray Calibration](../reviews/ray-calibration.md) — Bartsch et al., Optics Express 2021. LCD 위상 시프트로 픽셀별 광선을 재고 **멀티카메라를 하나의 광선장으로** — 과제의 ray calibration이 딛고 선 논문. (+ CV 쪽 계보: Grossberg & Nayar · Sturm & Ramalingam · Schöps)
+- [1D 타깃 캘리브레이션](../reviews/1d-calibration.md) — Zhang TPAMI 2004(존재 정리) + Duan et al., Optics Express 2022(순환 왜곡 보정으로 0.1% 정밀도). 현장에서 막대 하나로 캘리브레이션이 가능한 근거와 실현.
 
 ## 이 시리즈가 닿는 곳
 
