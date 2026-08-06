@@ -3,7 +3,7 @@
 <span class="rs-tag">Spatial Intelligence → Embodied</span>
 
 <p class="rs-lede">
-카메라가 본 것을 로봇 손이 닿게 — <strong>perception → action</strong>. KAIST 기계·전전 배경의 3D perception(stereo, LiDAR, calibration)과 실무의 NeRF·3DGS·reconstruction 경험을 로봇 문제로 확장하며, 그 위에 학습(grasp SOTA, VLA)을 <strong>정직하게 A/B</strong> 한 실습·스터디 노트. 모든 수치는 실측이고, 안 되는 것은 안 된다고 적는다.
+카메라가 본 것을 로봇 손이 닿게 — <strong>perception → action</strong>. 3D perception(stereo, LiDAR, calibration)과 NeRF·3DGS·reconstruction 경험을 로봇 문제로 확장하며, 그 위에 학습(grasp SOTA, VLA)을 <strong>정직하게 A/B</strong> 한 실습·스터디 노트. 모든 수치는 실측이고, 안 되는 것은 안 된다고 적는다.
 </p>
 
 ::::{grid} 1 2 2 3
