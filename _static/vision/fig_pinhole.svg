@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" viewBox="0 0 680 265" width="680" height="265">
+<rect width="680" height="265" fill="white"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16283C"/></marker><marker id="at" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1C7293"/></marker></defs>
+<line x1="40" y1="150" x2="620" y2="150" stroke="#8A97A3" stroke-width="1.4" stroke-dasharray="6 5"/>
+<text x="560" y="140" font-size="12" fill="#8A97A3">optical axis (z)</text>
+<circle cx="140" cy="150" r="4" fill="#16283C"/><text x="108" y="176" font-size="13" fill="#16283C" font-weight="bold">center O</text>
+<line x1="260" y1="55" x2="260" y2="245" stroke="#16283C" stroke-width="2.4"/>
+<text x="236" y="44" font-size="13" fill="#16283C" font-weight="bold">image plane</text>
+<line x1="140" y1="150" x2="260" y2="150" stroke="#1C7293" stroke-width="1.8"/>
+<text x="185" y="168" font-size="13" fill="#1C7293" font-weight="bold">f</text>
+<circle cx="540" cy="70" r="4.5" fill="#C0504D"/><text x="550" y="64" font-size="13" fill="#C0504D">P = (X, Y, Z)</text>
+<line x1="140" y1="150" x2="540" y2="70" stroke="#C0504D" stroke-width="1.6"/>
+<circle cx="260" cy="126" r="3.6" fill="#C0504D"/><text x="268" y="118" font-size="12.5" fill="#C0504D">p = (x, y)</text>
+<path d="M300 226 h 210" stroke="#16283C" stroke-width="1.4" marker-end="url(#a)" fill="none"/>
+<text x="306" y="245" font-size="13" fill="#16283C">x = f·X/Z ,  y = f·Y/Z  (동차좌표로는 p ~ K [R|t] P)</text>
+
+</svg>

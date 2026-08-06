@@ -21,8 +21,26 @@ parts:
   - caption: Concepts
     chapters:
       - file: concepts
+  - caption: Camera Geometry & Calibration
+    chapters:
+      - file: vision/index
+        sections:
+          - file: vision/coordinates
+          - file: vision/homogeneous
+          - file: vision/transforms-2d
+          - file: vision/homography
+          - file: vision/transforms-3d
+          - file: vision/imaging-geometry
+          - file: vision/epipolar
+          - file: vision/distortion
+          - file: vision/calibration
+          - file: vision/extrinsic
   - caption: Paper Reviews
     chapters:
+      - file: reviews/calibration
+        sections:
+          - file: reviews/ray-calibration
+          - file: reviews/1d-calibration
       - file: reviews/grasp
         sections:
           - file: reviews/graspnet

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" viewBox="0 0 720 310" width="720" height="310">
+<rect width="720" height="310" fill="white"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16283C"/></marker></defs>
+<circle cx="150" cy="205" r="5" fill="#16283C"/><text x="108" y="228" font-size="13" fill="#16283C" font-weight="bold">고정점 A</text>
+<line x1="150" y1="205" x2="248" y2="48" stroke="#1C7293" stroke-width="2.4"/><circle cx="199" cy="126" r="4" fill="#C0504D"/><circle cx="248" cy="48" r="4" fill="#C0504D"/><line x1="150" y1="205" x2="310" y2="113" stroke="#1C7293" stroke-width="2.4"/><circle cx="231" cy="158" r="4" fill="#C0504D"/><circle cx="310" cy="113" r="4" fill="#C0504D"/><line x1="150" y1="205" x2="335" y2="192" stroke="#1C7293" stroke-width="2.4"/><circle cx="243" cy="199" r="4" fill="#C0504D"/><circle cx="335" cy="192" r="4" fill="#C0504D"/><path d="M 235 145 A 100 100 0 0 1 245 185" stroke="#8A97A3" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+<text x="252" y="158" font-size="12" fill="#8A97A3">회전</text>
+<text x="300" y="42" font-size="12.5" fill="#C0504D">B, C … (간격을 아는 공선점)</text>
+<g transform="translate(455 105)">
+<g transform="rotate(12)"><rect x="0" y="0" width="130" height="100" fill="white" stroke="#16283C" stroke-width="1.8"/><line x1="20" y1="76" x2="104" y2="22" stroke="#1C7293" stroke-width="2"/><circle cx="20" cy="76" r="3" fill="#16283C"/><circle cx="63" cy="48" r="3" fill="#C0504D"/><circle cx="104" cy="22" r="3" fill="#C0504D"/></g>
+<text x="6" y="140" font-size="12.5" fill="#16283C" font-weight="bold">관측 이미지</text></g>
+<text x="60" y="292" font-size="13" fill="#8A97A3">한 점을 고정하고 회전하는 1D 물체 — 이미지 관측 + 길이 제약으로 K 폐형해 (Zhang, TPAMI 2004)</text>
+
+</svg>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif" viewBox="0 0 660 270" width="660" height="270">
+<rect width="660" height="270" fill="white"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16283C"/></marker><marker id="at" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1C7293"/></marker></defs>
+<g stroke="#16283C" stroke-width="2" fill="none">
+<line x1="60" y1="200" x2="130" y2="200" marker-end="url(#a)"/><line x1="60" y1="200" x2="60" y2="130" marker-end="url(#a)"/><line x1="60" y1="200" x2="20" y2="240" marker-end="url(#a)"/></g>
+<text x="30" y="120" font-size="14" fill="#16283C" font-weight="bold">World {W}</text>
+<text x="138" y="205" font-size="12" fill="#16283C">X</text><text x="48" y="122" font-size="12" fill="#16283C">Y</text><text x="6" y="255" font-size="12" fill="#16283C">Z</text>
+<g stroke="#1C7293" stroke-width="2" fill="none">
+<line x1="300" y1="170" x2="370" y2="185" marker-end="url(#at)"/><line x1="300" y1="170" x2="315" y2="100" marker-end="url(#at)"/><line x1="300" y1="170" x2="360" y2="120" marker-end="url(#at)"/></g>
+<text x="255" y="90" font-size="14" fill="#1C7293" font-weight="bold">Camera {C}</text>
+<text x="378" y="190" font-size="12" fill="#1C7293">x</text><text x="318" y="92" font-size="12" fill="#1C7293">y</text><text x="366" y="112" font-size="12" fill="#1C7293">z (optical axis)</text>
+<path d="M140 150 C 200 120, 240 130, 285 150" stroke="#8A97A3" stroke-width="1.6" fill="none" marker-end="url(#a)" stroke-dasharray="5 4"/>
+<text x="165" y="118" font-size="12.5" fill="#8A97A3">[R | t]  (extrinsic)</text>
+<rect x="470" y="95" width="150" height="112" fill="none" stroke="#16283C" stroke-width="1.8"/>
+<rect x="470" y="95" width="150" height="112" fill="#D8DFE6" opacity="0.25"/>
+<circle cx="545" cy="151" r="3.4" fill="#C0504D"/>
+<text x="552" y="147" font-size="12" fill="#C0504D">(u, v)</text>
+<text x="468" y="88" font-size="14" fill="#16283C" font-weight="bold">Image plane</text>
+<text x="470" y="228" font-size="12.5" fill="#8A97A3">K (intrinsic): focal f, principal point c</text>
+<path d="M395 150 C 425 145, 435 148, 462 150" stroke="#8A97A3" stroke-width="1.6" fill="none" marker-end="url(#a)" stroke-dasharray="5 4"/>
+<text x="398" y="136" font-size="12.5" fill="#8A97A3">projection</text>
+
+</svg>
