@@ -5,17 +5,17 @@ parts:
     chapters:
       - file: perception
       - file: manipulation
-  - caption: Spatial Intelligence · SLAM → World Models
+  - caption: SLAM · Localization & Mapping
     chapters:
       - file: slam
       - file: slam_math
-      - file: wm
-      - file: wm_math
-  - caption: Learned Grasping & Policies
+  - caption: Learned Grasping, Policies & World Models
     chapters:
       - file: grasp_sota
       - file: vla
       - file: context
+      - file: wm
+      - file: wm_math
   - caption: Hand & Human Pose
     chapters:
       - file: hand_pose
