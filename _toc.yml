@@ -47,11 +47,17 @@ parts:
           - file: reviews/1d-calibration
       - file: reviews/matching
         sections:
+          - file: reviews/matching-compare
           - file: reviews/superglue
+          - file: reviews/lightglue
           - file: reviews/loftr
+          - file: reviews/eloftr
           - file: reviews/dkm
+          - file: reviews/roma
           - file: reviews/cotr
+          - file: reviews/caps
           - file: reviews/colmap
+          - file: reviews/glomap
       - file: reviews/gs
         sections:
           - file: reviews/mip-splatting
