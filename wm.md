@@ -10,11 +10,13 @@
 
 한 문장: **과거 관측 $o_{\le t}$ 과 행동 $a_{\le t}$ 로부터 미래 $o_{t+1:t+h}$ (또는 그 표현·보상·가치)을 예측하는 학습된 시뮬레이터.** 계열은 "무엇을 예측 대상으로 두느냐"로 갈린다.
 
-| 축 | 예측 대상 | 대표 | 우리 스테이지 |
+| 축 | 예측 대상 | 대표 | 우리 스테이지 (자체구현 · 실제 공개모델) |
 |---|---|---|---|
-| 예측·표현형 | 미래의 **표현**(픽셀 아님) | JEPA, V-JEPA(-2) | **W1**(자체구현), **W4**(pretrained) |
-| 시퀀스·토큰형 | **잠재 상태**의 동역학 → 디코드 | Dreamer, PlaNet, TD-MPC | **W2** |
-| 생성·영상형 | **픽셀** 프레임 직접 생성 | DIAMOND, GameNGen, Genie | **W3** |
+| 예측·표현형 | 미래의 **표현**(픽셀 아님) | JEPA, V-JEPA(-2) | **W1**(자체) · **W4** V-JEPA-2, **W9** V-JEPA 2-AC(공식) |
+| 시퀀스·토큰형 | **잠재 상태**의 동역학 → 디코드 | Dreamer, PlaNet, TD-MPC | **W2**(자체) · **W6** TD-MPC2, **W7** DreamerV3(공식) |
+| 생성·영상형 | **픽셀** 프레임 직접 생성 | DIAMOND, GameNGen, Cosmos | **W3**(자체) · **W8** DIAMOND, **W10** CogVideoX(공식) |
+
+> 아래 §2–7이 자체구현 트랙(W0–W5), **§8이 실제 공개 체크포인트/코드를 그대로 돌린 트랙(W6–W10)**이다.
 
 ## 2. 공통 셋업 (W0 — 평가 harness)
 
@@ -94,4 +96,53 @@ W1이 **우리 시퀀스로 학습한** tiny 인코더였다면, 여기선 Meta�
 2. **표현형은 픽셀을 그리지 않는 대신 기하를 가장 깨끗이 담는다**(W1 probe $R^2$가 최고). "예측을 위한 표현"이 곧 "쓸모 있는 상태 추정"이 된다 — SLAM과 만나는 지점.
 3. **범용 pretrained 표현(W4)은 zero-shot으로도 기하를 상당히 담지만**, 좁은 도메인에선 작은 in-domain 모델이 이긴다. 실전에선 pretrained를 얼려 쓰고 가벼운 head만 얹는 절충이 자연스럽다.
 
-정직한 경계: 전부 **단일 짧은 시퀀스(200프레임)·정적 장면·알려진 GT action**에서의 **수렴/메커니즘 데모**다. SOTA 재현이 아니라 "세 계열의 목적함수와 rollout 동역학을 직접 구현해 GT로 측정했다"가 이 트랙의 주장이다. 다음 확장: 물체가 독립적으로 움직이는 동적 장면, action을 추정값으로 대체(관측만으로), TUM 실데이터로의 전이.
+정직한 경계: 전부 **단일 짧은 시퀀스(200프레임)·정적 장면·알려진 GT action**에서의 **수렴/메커니즘 데모**다. SOTA 재현이 아니라 "세 계열의 목적함수와 rollout 동역학을 직접 구현해 GT로 측정했다"가 이 트랙의 주장이다.
+
+## 8. 실제 공개 월드모델 실행 (W6–W10) — 자체구현에서 진짜 SOTA로
+
+W1–W4는 세 계열의 **목적함수·rollout 동역학을 우리가 밑바닥부터 구현/학습**해 메커니즘을 증명한 것이었다. [VLA 트랙](vla.md)에서 OpenVLA-7B를 실제로 파인튜닝했듯, 여기선 각 계열의 **실제 공개 체크포인트/코드를 그대로 실행**해 대조한다. 이 RL·영상 월드모델들은 구버전 스택(torch 2.4.1, gym 0.22, ale-py 0.9 등)을 요구해 Windows 단일 4090 위에서 **모델별 격리 환경**으로 돌렸다.
+
+### W6 — TD-MPC2 (공식 체크포인트 · 잠재동역학+제어)
+
+`nicklashansen/tdmpc2`의 5M 단일태스크 체크포인트(cheetah-run)를 로드. 제어 성능은 5에피소드 return **863±12**(논문급). 더 중요한 건 이 에이전트 **내부의 학습된 latent world model**을 직접 뜯어본 것: 시작 잠재에서 에이전트가 실제로 취한 행동으로 open-loop rollout하고, 재인코딩한 실제 잠재와의 오차를 horizon별로 잰다 — latent-MSE $2.9\times10^{-5}$(h1) → $6.7\times10^{-3}$(h30), 보상예측 오차 0.006 → 0.12로 단조 증가. **W1/W2에서 본 horizon-drift 곡선을 진짜 SOTA RL 월드모델에서 그대로 재현**했다.
+
+<img src="_static/wm_tdmpc2.png" alt="TD-MPC2 control return + learned latent world-model horizon error" style="width:100%;max-width:1100px;border-radius:8px">
+
+### W7 — DreamerV3 (직접 학습 · 잠재 상상)
+
+`NM512/dreamerv3-torch`를 격리환경(torch 2.4.1)에서 DMC-vision walker로 **직접 학습**했다. W2에서 우리가 구현한 RSSM의 "진짜" 버전. `video_pred`로 5프레임 posterior burn-in 후 **prior만으로 상상 rollout**을 디코드해 실제와 대조 — imagination PSNR **26.4 → 22.2 dB**(64프레임). 정직: 시간 예산상 **~15k env step에서 조기 종료**한 미수렴 데모라 정책은 walker를 아직 잘 못 걷지만, 상상 프레임이 walker 형상·바닥을 재현하며 drift하는 **월드모델의 상상 구조 자체는 명확**하다(우리 [VLA 4%](vla.md)와 같은 "학습량의 벽" 정직 원칙).
+
+<img src="_static/wm_dreamer.png" alt="DreamerV3 imagination rollout vs real + PSNR curve" style="width:100%;max-width:1100px;border-radius:8px">
+
+### W8 — DIAMOND (공식 · 생성·영상 diffusion)
+
+`eloialonso/diamond`의 Atari-100k pretrained(Breakout, 13.5M) — W3에서 구현한 조건부 diffusion 월드모델의 실제 SOTA. 실제 env에서 4프레임 burn-in 후 **diffusion 디노이징으로 다음 프레임을 생성**하고 정책을 되먹여 48프레임 자기회귀 rollout(=플레이 가능한 신경 시뮬레이터)을 만든다. 벽돌·패들·공은 물론 **점수 카운터(000→001)까지 생성**되고, EDM 디노이징은 단 **4스텝**(아래 하단 행: 노이즈→프레임). 도메인은 Atari라 로보틱스와는 거리가 있지만, 생성·영상 계열의 실제 동작을 보여준다.
+
+<img src="_static/wm_diamond.png" alt="DIAMOND generated Atari rollout + EDM denoising steps" style="width:100%;max-width:1100px;border-radius:8px">
+
+### W9 — V-JEPA 2-AC (공식 · 행동조건 예측 → 계획)
+
+Meta의 action-conditioned V-JEPA 2(ViT-g, **1.3B**)를 `torch.hub`로 로드, 레포 내장 **Franka 로봇 궤적**으로 정식 energy-landscape 프로브를 재현했다. 컨텍스트 프레임을 인코딩한 뒤 후보 3-D end-effector delta 그리드마다 미래 잠재를 예측하고 에너지 $=\lvert\hat z-z_{\text{real}}\rvert$를 잰다. 결과: **에너지 최소가 실제 행동 방향에 위치**하고(정방향 $(+,+,+)$ 옥탄트, 궤적을 뒤집으면 $(-,-,-)$로 정확히 반전) — 행동조건화가 진짜임을 반전 실험으로 증명. 최소-에너지 행동은 GT까지 0.048로 zero-action(0.129)보다 2.7× 가깝고, 내장 **CEM 플래너**는 월드모델만으로 실제 행동을 거리 **0.056**까지 복원한다(예측 월드모델 → 계획으로의 연결).
+
+<img src="_static/wm_vjepa2ac.png" alt="V-JEPA 2-AC energy landscape forward vs reverse trajectory" style="width:100%;max-width:1000px;border-radius:8px">
+
+### W10 — 대형 생성·영상 파운데이션 (Cosmos는 gated → CogVideoX-5B-I2V로 대체)
+
+NVIDIA **Cosmos-Predict2**는 gated 레포(라이선스 동의 + 인증 토큰 필요)라 자율 실행이 불가능했다. 같은 "관측 1장 → 미래 영상" 축을 **ungated CogVideoX-5B-I2V**(5.57B)로 대체해, **우리 slam_seq 프레임 1장**을 컨텍스트로 49프레임 미래영상을 생성했다. 합성 테이블탑은 범용 영상모델에 OOD인데도 블록·실린더 배치를 **시간적으로 일관되게** 유지한다(파운데이션 스케일의 사실성). 행동조건·예측형 파운데이션 버킷은 W9(V-JEPA 2-AC)가 이미 담당.
+
+<img src="_static/wm_cogvideox.png" alt="CogVideoX-5B image-to-video future prediction from our slam_seq frame" style="width:100%;max-width:1100px;border-radius:8px">
+
+### 실제 공개 월드모델 역량 지도
+
+| 모델 | 축 | 파라미터 | 도메인 | 측정 결과 |
+|---|---|---|---|---|
+| V-JEPA-2 ViT-L | 예측·표현 (frozen) | 326M | our slam_seq | zero-shot probe cam $R^2$≈0.76, depth 0.76 |
+| TD-MPC2 | 잠재동역학+제어 (RL, 공식) | 4.96M | cheetah-run | return 863±12; latMSE h30=6.7e-3 |
+| DreamerV3 | 잠재 상상 (RSSM, 직접 학습) | 15.7M | dmc walker | imag PSNR 26.4→22.2 dB (early-stop, 미수렴) |
+| DIAMOND | 생성·영상 (diffusion, 공식) | 13.5M | Breakout | 48프레임 자기회귀 생성, 4스텝 디노이즈 |
+| V-JEPA 2-AC ViT-g | 행동조건 예측·계획 (공식) | 1.3B | Franka traj | energy min→GT 0.048 (0-act 0.129); CEM d=0.056 |
+| CogVideoX-5B-I2V | 생성·영상 파운데이션 (공식) | 5.57B | our slam_seq→future | 49프레임 미래영상 예측 |
+
+이 표는 리더보드가 아니라 **축 × 모델 × 스케일 × 측정대상의 역량 지도**다(도메인·지표가 서로 다르다). 자체구현(W1–W4, 메커니즘)과 실제 공개모델(W6–W10, 스케일)을 나란히 놓으면 같은 현상이 확인된다: **잠재 rollout이 픽셀보다 drift에 강하고**(TD-MPC2 latent horizon vs DIAMOND 픽셀 자기회귀), **표현이 기하를 담으며**(V-JEPA-2 probe), **행동조건이 계획을 가능케 하고**(V-JEPA 2-AC energy/CEM), **생성·영상은 스케일로 사실성을 얻지만 픽셀 drift·샘플링 비용이 크다**(DIAMOND, CogVideoX).
+
+정직한 경계(전체): W1–W4는 단일 짧은 시퀀스의 수렴/메커니즘 데모, W6–W10은 실제 공개모델이지만 **DreamerV3는 미수렴(조기 종료), Cosmos는 gated로 미실행(대체 실행), 도메인·지표가 상이**하다. 다음 확장: 동적 장면, 관측만으로 action 추정, TUM 실데이터 전이, 그리고 HF 접근권이 생기면 Cosmos 본체 실행.
