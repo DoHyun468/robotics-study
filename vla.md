@@ -122,3 +122,23 @@ train 지표는 더 좋아졌는데 **성공률은 20% → 0%로 오히려 떨�
 # WSL2 ov env (torch2.2 + flash-attn + LIBERO + robosuite)
 conda run -n ov bash _wsl/run_ov_eval.sh   # openvla-7b-finetuned-libero-spatial, 첫 실행 시 체크포인트 자동 다운로드(~14GB)
 ```
+
+## Human 시연 → VLA 학습데이터 파이프라인
+
+위가 "VLA 모델을 **학습·평가**"였다면, 여기선 그 **학습데이터를 만드는 파이프라인**을 다룬다 — RLWRLD류 JD의 "대규모 human 데몬스트레이션을 VLA 학습데이터로 변환 + sim2real 증강/inpainting + 품질 검증". 검증된 pick 스택(Franka Panda + `dls_ik`) 위에서 [HM5 human→robot retargeting](human_pose.md)이 내놓는 파지 의도(target · grasp yaw · aperture)를 로봇으로 실행하며 VLA 포맷 에피소드를 자동 생성한다.
+
+**① INGEST/RETARGET → 기록.** human 파지 의도를 Franka approach→grasp→close→lift로 실행하고, 매 스텝 기록한다: **obs**(256² RGB agentview), **action 7-dof** `[Δx,Δy,Δz,0,0,Δyaw,gripper]`(LIBERO/OpenVLA식 EE-delta), **proprio**(관절+그리퍼), **language instruction**(`"pick up the {color} block"`, 박스 색을 지시 색으로 실제 렌더 → 진짜 language-conditioned). 16 에피소드 중 12 실행 성공.
+
+<img src="_static/vla_datapipe.png" alt="VLA episode + action trace + quality filter dashboard" style="width:100%;max-width:1150px;border-radius:8px">
+
+**② Augmentation (sim2real).** 렌더 sim의 도메인 갭을 줄이는 표준 증강: photometric domain randomization(밝기·대비·색조) + gaussian sensor noise + cutout. 한 관측에서 다양한 도메인 변형을 만들어 정책이 렌더 특유의 통계에 과적합하지 않게 한다.
+
+<img src="_static/vla_augment.png" alt="sim2real photometric domain randomization variants" style="width:100%;max-width:1150px;border-radius:8px">
+
+**③ Inpainting (human-embodiment 제거).** 시연 프레임에 들어온 **시연자 손/팔을 마스킹 → `cv2` Telea inpaint로 제거**한다. human 영상을 로봇 중심 관측으로 바꾸는, human→robot 데이터의 embodiment-gap 트릭. (large region이라 약간의 smear가 남는 건 classical inpaint의 한계 — diffusion inpaint로 교체 가능.)
+
+<img src="_static/vla_inpaint.png" alt="human hand masked and inpainted out of demo frame" style="width:100%;max-width:820px;border-radius:8px">
+
+**④ 품질 자동 필터.** 에피소드별로 성공(리프트) · action jerk(smoothness) · IK feasibility를 측정해 자동 필터링. 일부러 섞은 **그리퍼 폭(72mm) 초과 파지(비실현 retargeting) 4개가 리프트 실패 → 자동 드롭**, 12/16 keep. 위 대시보드의 workspace coverage에 kept(초록)/dropped(빨강)로 표시된다 — "나쁜 시연을 걸러내는" 데이터 품질 게이트.
+
+정직한 경계: sim 시연(합성)·소규모 데모 파이프라인이다. 실제 대규모 실사 human 비디오, 다관절 dexterous retargeting, RLDS/Open-X 표준 직렬화는 다음 확장. 그래도 **"human 의도 → 로봇 실행 → (obs, instruction, action) 학습샘플 + 증강 + inpainting + 자동 품질필터"**라는 파이프라인 뼈대와 각 단계를 GT로 측정 가능하게 구현했다. 코드: `src/vla_datapipe.py`.
