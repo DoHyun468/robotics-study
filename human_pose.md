@@ -540,20 +540,25 @@ $$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert 
 
 ```{admonition} 정직한 정정 — "관통" 버그 (2026-08-05)
 :class: warning
-이 절의 초기 버전은 **손끝 3개만** 표면에 붙이고 force-closure만 최적화했다. 그런데 **손바닥·손가락 마디가 물체를 파고드는 것(hand↔object 관통)을 목적함수가 전혀 막지 않았고**, 렌더 속 mug는 시각 전용 geom이라 물리 충돌도 없었다. 그래서 처음 보고한 **ε +0.054는 손이 mug를 ~2mm 파고들어 얻은 부풀린 값**이었다. DexGraspNet식 관통 패널티 $E_{\text{pen}}$(손 body들이 물체 안에 들어가면 벌점)을 추가해 다시 풀었다. 아래 수치는 **관통 0mm를 강제한 물리적으로 유효한** 결과다.
+이 절의 초기 버전은 **손끝 3개만** 표면에 붙이고 force-closure만 최적화했다. 그런데 **손바닥·손가락 마디가 물체를 파고드는 것(hand↔object 관통)을 목적함수가 전혀 막지 않았고**, 렌더 속 mug는 시각 전용 geom이라 물리 충돌도 없었다. 그래서 처음 보고한 **ε +0.054는 손이 mug를 ~2mm 파고들어 얻은 부풀린 값**이었다. DexGraspNet식 관통 패널티 $E_{\text{pen}}$(손 body들이 물체 안에 들어가면 벌점)을 추가해 다시 풀었다.
+```
+
+```{admonition} 2차 정정 — E_pen이 여전히 과소측정이었다 (2026-08-07)
+:class: warning
+위 "$E_{\text{pen}}$으로 관통 0mm"도 정확하지 않았다. 그 $E_{\text{pen}}$은 손의 **13개 링크 원점(중심점)** 만 물체 안에 있는지 봤기 때문에, 링크 **표면**이 mug를 파고드는 건 못 잡았다 — 링크 중심이 밖이어도 손가락·손바닥 표면은 여전히 들어간다. **손 충돌메시 정점을 조밀하게** 샘플해 mug 표면과의 signed distance로 다시 재니 **실제 표면 관통은 ~2.0mm**였다(13점 지표는 0.0mm). 물체를 손 밖으로 25mm까지 평행이동시켜도 관통은 2.0mm 그대로이고 force-closure만 깨진다 — 손이 mug를 **감싸는** 형태라 한 방향으로 밀면 반대쪽 링크가 더 파고들기 때문. 즉 이 **~2mm 관통은 4손가락 Allegro가 손 크기 mug를 쥘 때 grasp을 깨지 않고는 못 없애는 cross-morphology 잔차**(§11.9 벽의 또 다른 얼굴)다. 아래 표·그림·§11.11의 "0mm"는 **성긴 13점 지표 기준**이고, 정직한 **dense 실측은 ~2.0mm**다. **교훈: 최적화·검증 지표가 실제 물리량을 대표하지 못하면 "해결"이 허수가 된다 — 지표는 조밀하게, 렌더로 눈으로도 검증해야 한다.** (현재 §11.12 그림 제목에 dense 관통값을 명시함.)
 ```
 
 | 지표 (grasp-moment frame, 3지 precision) | §11.9 사람 접촉 복사 | §11.10 grasp 합성 |
 |---|---|---|
 | 손끝 → mug 표면 gap | 31.1 mm | **16.8 mm** |
 | force-closure $\varepsilon$ | −0.121 (**불가 ✘**) | **+0.031 (안정 ✔, 여유는 작음)** |
-| **물체 관통** | 1.7 mm | **0.0 mm** |
+| **물체 관통** — 13점 지표 / **dense 실측** | 1.7 mm | 0.0 mm / **~2.0 mm** (위 2차 정정) |
 | self-collision | 0 | 0 |
 | 손 재배치량 $\lVert t_{\text{off}}\rVert$ | — | 33 mm |
 
-**핵심:** 사람 접촉점을 복사하면 gap 31mm·force-closure **실패**(ε −0.12)에 물체까지 파고든다. 반면 **손을 33mm 재배치하고 접촉점을 로봇에 맞게 다시 고르고 관통을 금지하면** gap 17mm·ε가 **양수(+0.031)로 바뀌어 물리적으로 유효한(관통 0mm) 잡을 수 있는 grasp**이 된다. §11.9가 증명한 벽을 §11.10이 **넘는 방법**(hand placement + contact re-planning + 비관통)을 실데이터 물체에서 보여준 것.
+**핵심:** 사람 접촉점을 복사하면 gap 31mm·force-closure **실패**(ε −0.12)에 물체까지 파고든다. 반면 **손을 33mm 재배치하고 접촉점을 로봇에 맞게 다시 고르면** gap 15–17mm·ε가 **양수(+0.03–0.05)로 바뀌어 잡을 수 있는(force-closure) grasp**이 된다(단, 관통은 13점 지표상 0mm일 뿐 **dense 실측 ~2mm** — 위 2차 정정). §11.9가 증명한 벽을 §11.10이 **넘는 방법**(hand placement + contact re-planning + 비관통)을 실데이터 물체에서 보여준 것.
 
-*정직: ε +0.031은 **양수지만 여유가 작다** — force-closure 경계 바로 위의 marginal grasp이다(관통을 허용했을 때의 +0.054는 허수였다). 잔차 gap 17mm는 3지·고정 손가락 길이·곡면 mug의 한계. 손 배치는 3-DoF 병진 근사(§11.11에서 회전까지, §11.12에서 arm IK). 이것이 GraspIt·DexGraspNet·contact-GraspNet 계열 grasp 합성의 축소판이다.*
+*정직: ε ≈ +0.03–0.05는 **양수지만 여유가 작다** — force-closure 경계 바로 위의 marginal grasp이고, 게다가 이 값은 **~2mm 표면 관통을 포함한 채** 얻은 것이다(13점 지표가 관통을 0으로 과소보고 → 위 2차 정정; 이 잔차 관통은 형태 차이로 제거 불가). 잔차 gap 17mm는 3지·고정 손가락 길이·곡면 mug의 한계. 손 배치는 3-DoF 병진 근사(§11.11에서 회전까지, §11.12에서 arm IK). 이것이 GraspIt·DexGraspNet·contact-GraspNet 계열 grasp 합성의 축소판이다.*
 
 **→ 트랙의 완결:** HM5(합성 retarget) → §11.8(실 grasp retarget) → §11.9(접촉 제약 + 벽 발견) → **§11.10(grasp 합성으로 벽 돌파)**. perception→action이 다른 morphology로 넘어갈 때 필요한 것 — 3D 인식, 접촉 이해, 도달성·안정성 최적화 — 을 실데이터로 관통했다.
 
@@ -561,13 +566,13 @@ $$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert 
 
 **왜 이걸 하나 (§11.10을 더 밀어보기).** §11.10은 손을 3-DoF **병진**으로만 옮겼다. 자연스러운 다음 수는 **손목 회전까지** 더한 full 6-DoF 손 배치다 — 손이 물체에 맞게 자세를 잡으면 더 좋은 grasp이 나올 것 같았다. 그래서 손가락 관절 $q$ + 손 배치 $(t_{\text{off}}, r_{\text{off}})$(병진+축각 회전, 물체 중심 기준)를 함께 최적화하고, 여러 초기 손목 방향에서 multi-start로 후보를 모았다.
 
-**발견 — "무엇을 최적화하느냐"가 핵심이었다** (모든 후보는 관통 0mm 강제). 회전을 자유롭게 두고 **접촉 gap을 최소화**하면 손끝이 더 바짝 붙지만(gap 14mm) force-closure 여유가 작다(ε +0.013). 같은 후보를 **force-closure ε로 정렬**하면 gap은 조금 크지만(17mm) **ε +0.031로 2.3배 더 안정적인 grasp**이 선택된다. 즉 가장 바짝 붙는 게 가장 안정적인 게 아니다.
+**발견 — "무엇을 최적화하느냐"가 핵심이었다** (모든 후보는 13점 지표 기준 관통 0mm; dense 실측은 ~2mm 잔차 — §11.10 2차 정정). 회전을 자유롭게 두고 **접촉 gap을 최소화**하면 손끝이 더 바짝 붙지만(gap 14mm) force-closure 여유가 작다(ε +0.013). 같은 후보를 **force-closure ε로 정렬**하면 gap은 조금 크지만(17mm) **ε +0.031로 2.3배 더 안정적인 grasp**이 선택된다. 즉 가장 바짝 붙는 게 가장 안정적인 게 아니다.
 
 <img src="_static/hm5e_6dof.png" alt="6-DoF grasp synthesis: ranking by gap vs by force-closure gives different grasps" style="width:100%;max-width:1280px;border-radius:8px">
 
-*좌=실제 grasp. 중=6-DoF 후보 중 **gap 최소**(가장 바짝, 안정 여유 작음). 우=같은 후보 중 **force-closure ε 최대**(gap은 크지만 가장 안정). 둘 다 관통 0mm·force-closure ✔지만 안정 여유는 우측이 2.3배.*
+*좌=실제 grasp. 중=6-DoF 후보 중 **gap 최소**(가장 바짝, 안정 여유 작음). 우=같은 후보 중 **force-closure ε 최대**(gap은 크지만 가장 안정). 둘 다 force-closure ✔(관통은 13점 지표 0mm·dense ~2mm)지만 안정 여유는 우측이 2.3배.*
 
-| 6-DoF 후보 (8개, 관통 0mm, grasp-moment frame) | gap | force-closure ε | 손 회전 |
+| 6-DoF 후보 (8개, 13점 지표 관통 0mm / dense ~2mm, grasp-moment frame) | gap | force-closure ε | 손 회전 |
 |---|---|---|---|
 | **gap 최소**로 선택 (가장 바짝) | **14.3 mm** | +0.013 (✔, 여유 작음) | 15° |
 | **force-closure ε 최대**로 선택 | 16.8 mm | **+0.031 (✔, 가장 안정)** | 0° |
