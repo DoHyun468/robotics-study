@@ -45,6 +45,24 @@ parts:
         sections:
           - file: reviews/ray-calibration
           - file: reviews/1d-calibration
+      - file: reviews/matching
+        sections:
+          - file: reviews/superglue
+          - file: reviews/loftr
+          - file: reviews/dkm
+          - file: reviews/cotr
+          - file: reviews/colmap
+      - file: reviews/gs
+        sections:
+          - file: reviews/mip-splatting
+          - file: reviews/2dgs
+          - file: reviews/rade-gs
+          - file: reviews/gs-mcmc
+      - file: reviews/feedforward
+        sections:
+          - file: reviews/dust3r
+          - file: reviews/mast3r
+          - file: reviews/vggt
       - file: reviews/grasp
         sections:
           - file: reviews/graspnet
