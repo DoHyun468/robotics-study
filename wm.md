@@ -137,23 +137,23 @@ Meta의 action-conditioned V-JEPA 2(ViT-g, **1.3B**)를 `torch.hub`로 로드, �
 
 ### W10 — 대형 생성·영상 파운데이션 (Cosmos는 gated → CogVideoX-5B-I2V로 대체)
 
-NVIDIA **Cosmos-Predict2**는 gated 레포(라이선스 동의 + 인증 토큰 필요)라 자율 실행이 불가능했다. 같은 "관측 1장 → 미래 영상" 축을 **ungated CogVideoX-5B-I2V**(5.57B)로 대체해, **우리 MuJoCo 시퀀스 프레임 1장**을 컨텍스트로 49프레임 미래영상을 생성했다. 합성 테이블탑은 범용 영상모델에 OOD인데도 블록·실린더 배치를 **시간적으로 일관되게** 유지한다(파운데이션 스케일의 사실성). 행동조건·예측형 파운데이션 버킷은 W9(V-JEPA 2-AC)가 이미 담당.
+NVIDIA **Cosmos-Predict2**는 gated 레포(라이선스 동의 + 인증 토큰 필요)라 자율 실행이 불가능했다. 같은 "관측 1장 → 미래 영상" 축을 **ungated CogVideoX-5B-I2V**(5.57B)로 대체해, **우리 slam_seq 프레임 1장**을 컨텍스트로 49프레임 미래영상을 생성했다. 합성 테이블탑은 범용 영상모델에 OOD인데도 블록·실린더 배치를 **시간적으로 일관되게** 유지한다(파운데이션 스케일의 사실성). 행동조건·예측형 파운데이션 버킷은 W9(V-JEPA 2-AC)가 이미 담당.
 
-<img src="_static/wm_cogvideox_gen.gif" alt="CogVideoX generated future video from our MuJoCo frame" style="width:100%;max-width:900px;border-radius:8px"><br>
-<em>↑ 우리 MuJoCo 시퀀스 프레임 1장만 주고 5.57B 모델이 생성한 49프레임 미래영상(합성 장면이라 OOD인데도 블록·실린더 배치가 일관).</em>
+<img src="_static/wm_cogvideox_gen.gif" alt="CogVideoX generated future video from our slam_seq frame" style="width:100%;max-width:900px;border-radius:8px"><br>
+<em>↑ 우리 slam_seq 프레임 1장만 주고 5.57B 모델이 생성한 49프레임 미래영상(합성 장면이라 OOD인데도 블록·실린더 배치가 일관).</em>
 
-<img src="_static/wm_cogvideox.png" alt="CogVideoX-5B image-to-video future prediction from our MuJoCo frame" style="width:100%;max-width:1100px;border-radius:8px">
+<img src="_static/wm_cogvideox.png" alt="CogVideoX-5B image-to-video future prediction from our slam_seq frame" style="width:100%;max-width:1100px;border-radius:8px">
 
 ### 실제 공개 월드모델 역량 지도
 
 | 모델 | 축 | 파라미터 | 도메인 | 측정 결과 |
 |---|---|---|---|---|
-| V-JEPA-2 ViT-L | 예측·표현 (frozen) | 326M | our MuJoCo seq | zero-shot probe cam $R^2$≈0.76, depth 0.76 |
+| V-JEPA-2 ViT-L | 예측·표현 (frozen) | 326M | our slam_seq | zero-shot probe cam $R^2$≈0.76, depth 0.76 |
 | TD-MPC2 | 잠재동역학+제어 (RL, 공식) | 4.96M | cheetah-run | return 863±12; latMSE h30=6.7e-3 |
 | DreamerV3 | 잠재 상상 (RSSM, 직접 학습) | 15.7M | dmc walker | imag PSNR 26.4→22.2 dB (early-stop, 미수렴) |
 | DIAMOND | 생성·영상 (diffusion, 공식) | 13.5M | Breakout | 48프레임 자기회귀 생성, 4스텝 디노이즈 |
 | V-JEPA 2-AC ViT-g | 행동조건 예측·계획 (공식) | 1.3B | Franka traj | energy min→GT 0.048 (0-act 0.129); CEM d=0.056 |
-| CogVideoX-5B-I2V | 생성·영상 파운데이션 (공식) | 5.57B | our MuJoCo frame→future | 49프레임 미래영상 예측 |
+| CogVideoX-5B-I2V | 생성·영상 파운데이션 (공식) | 5.57B | our slam_seq→future | 49프레임 미래영상 예측 |
 
 이 표는 리더보드가 아니라 **축 × 모델 × 스케일 × 측정대상의 역량 지도**다(도메인·지표가 서로 다르다). 자체구현(W1–W4, 메커니즘)과 실제 공개모델(W6–W10, 스케일)을 나란히 놓으면 같은 현상이 확인된다: **잠재 rollout이 픽셀보다 drift에 강하고**(TD-MPC2 latent horizon vs DIAMOND 픽셀 자기회귀), **표현이 기하를 담으며**(V-JEPA-2 probe), **행동조건이 계획을 가능케 하고**(V-JEPA 2-AC energy/CEM), **생성·영상은 스케일로 사실성을 얻지만 픽셀 drift·샘플링 비용이 크다**(DIAMOND, CogVideoX).
 
