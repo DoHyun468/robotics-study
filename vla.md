@@ -135,9 +135,9 @@ conda run -n ov bash _wsl/run_ov_eval.sh   # openvla-7b-finetuned-libero-spatial
 
 <img src="_static/vla_augment.png" alt="sim2real photometric domain randomization variants" style="width:100%;max-width:1150px;border-radius:8px">
 
-**③ Inpainting (human-embodiment 제거).** 시연 프레임에 들어온 **시연자 손/팔을 마스킹 → `cv2` Telea inpaint로 제거**한다. human 영상을 로봇 중심 관측으로 바꾸는, human→robot 데이터의 embodiment-gap 트릭. (large region이라 약간의 smear가 남는 건 classical inpaint의 한계 — diffusion inpaint로 교체 가능.)
+**③ Sim2real — 정확 세그멘테이션 → background randomization.** MuJoCo에서 **픽셀 단위로 정확한 세그멘테이션 라벨을 공짜로** 얻는다(로봇 링크·물체·테이블 각각 분리). 이를 이용해 **로봇+물체는 그대로 두고 배경만 무작위화** — 정책이 렌더 특유의 배경 통계에 과적합하지 않게 하는 sim2real 핵심 기법(합성이라 뭉갬 없이 깨끗). 동일한 exact 마스크가 occlusion inpainting(가림 복원)이나 human-video 파이프라인의 **시연자 제거**에도 그대로 쓰인다 — 여기선 실제 human 비디오가 없어 background randomization으로 시연.
 
-<img src="_static/vla_inpaint.png" alt="human hand masked and inpainted out of demo frame" style="width:100%;max-width:820px;border-radius:8px">
+<img src="_static/vla_sim2real.png" alt="exact MuJoCo segmentation → background randomization" style="width:100%;max-width:1150px;border-radius:8px">
 
 **④ 품질 자동 필터.** 에피소드별로 성공(리프트) · action jerk(smoothness) · IK feasibility를 측정해 자동 필터링. 일부러 섞은 **그리퍼 폭(72mm) 초과 파지(비실현 retargeting) 4개가 리프트 실패 → 자동 드롭**, 12/16 keep. 위 대시보드의 workspace coverage에 kept(초록)/dropped(빨강)로 표시된다 — "나쁜 시연을 걸러내는" 데이터 품질 게이트.
 
