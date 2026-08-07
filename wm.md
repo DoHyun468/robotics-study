@@ -106,17 +106,26 @@ W1–W4는 세 계열의 **목적함수·rollout 동역학을 우리가 밑바�
 
 `nicklashansen/tdmpc2`의 5M 단일태스크 체크포인트(cheetah-run)를 로드. 제어 성능은 5에피소드 return **863±12**(논문급). 더 중요한 건 이 에이전트 **내부의 학습된 latent world model**을 직접 뜯어본 것: 시작 잠재에서 에이전트가 실제로 취한 행동으로 open-loop rollout하고, 재인코딩한 실제 잠재와의 오차를 horizon별로 잰다 — latent-MSE $2.9\times10^{-5}$(h1) → $6.7\times10^{-3}$(h30), 보상예측 오차 0.006 → 0.12로 단조 증가. **W1/W2에서 본 horizon-drift 곡선을 진짜 SOTA RL 월드모델에서 그대로 재현**했다.
 
+<img src="_static/wm_tdmpc2_run.gif" alt="TD-MPC2 agent controlling cheetah-run" style="width:100%;max-width:420px;border-radius:8px"><br>
+<em>↑ 이 월드모델 에이전트가 실제로 굴린 cheetah-run 에피소드.</em>
+
 <img src="_static/wm_tdmpc2.png" alt="TD-MPC2 control return + learned latent world-model horizon error" style="width:100%;max-width:1100px;border-radius:8px">
 
 ### W7 — DreamerV3 (직접 학습 · 잠재 상상)
 
 `NM512/dreamerv3-torch`를 격리환경(torch 2.4.1)에서 DMC-vision walker로 **직접 학습**했다. W2에서 우리가 구현한 RSSM의 "진짜" 버전. `video_pred`로 5프레임 posterior burn-in 후 **prior만으로 상상 rollout**을 디코드해 실제와 대조 — imagination PSNR **26.4 → 22.2 dB**(64프레임). 정직: 시간 예산상 **~15k env step에서 조기 종료**한 미수렴 데모라 정책은 walker를 아직 잘 못 걷지만, 상상 프레임이 walker 형상·바닥을 재현하며 drift하는 **월드모델의 상상 구조 자체는 명확**하다(우리 [VLA 4%](vla.md)와 같은 "학습량의 벽" 정직 원칙).
 
+<img src="_static/wm_dreamer_imag.gif" alt="DreamerV3 imagination vs real walker" style="width:100%;max-width:520px;border-radius:8px"><br>
+<em>↑ 위=실제 walker, 아래=Dreamer가 5프레임만 보고 상상(prior rollout)한 미래. 형상은 따라가되 시간이 갈수록 흐려지는 drift가 보인다.</em>
+
 <img src="_static/wm_dreamer.png" alt="DreamerV3 imagination rollout vs real + PSNR curve" style="width:100%;max-width:1100px;border-radius:8px">
 
 ### W8 — DIAMOND (공식 · 생성·영상 diffusion)
 
 `eloialonso/diamond`의 Atari-100k pretrained(Breakout, 13.5M) — W3에서 구현한 조건부 diffusion 월드모델의 실제 SOTA. 실제 env에서 4프레임 burn-in 후 **diffusion 디노이징으로 다음 프레임을 생성**하고 정책을 되먹여 48프레임 자기회귀 rollout(=플레이 가능한 신경 시뮬레이터)을 만든다. 벽돌·패들·공은 물론 **점수 카운터(000→001)까지 생성**되고, EDM 디노이징은 단 **4스텝**(아래 하단 행: 노이즈→프레임). 도메인은 Atari라 로보틱스와는 거리가 있지만, 생성·영상 계열의 실제 동작을 보여준다.
+
+<img src="_static/wm_diamond_play.gif" alt="DIAMOND diffusion-generated Breakout rollout" style="width:100%;max-width:320px;border-radius:8px;image-rendering:pixelated"><br>
+<em>↑ 실제 게임 엔진이 아니라 diffusion 월드모델이 매 프레임을 생성한 Breakout(정책이 그 안에서 플레이).</em>
 
 <img src="_static/wm_diamond.png" alt="DIAMOND generated Atari rollout + EDM denoising steps" style="width:100%;max-width:1100px;border-radius:8px">
 
@@ -129,6 +138,9 @@ Meta의 action-conditioned V-JEPA 2(ViT-g, **1.3B**)를 `torch.hub`로 로드, �
 ### W10 — 대형 생성·영상 파운데이션 (Cosmos는 gated → CogVideoX-5B-I2V로 대체)
 
 NVIDIA **Cosmos-Predict2**는 gated 레포(라이선스 동의 + 인증 토큰 필요)라 자율 실행이 불가능했다. 같은 "관측 1장 → 미래 영상" 축을 **ungated CogVideoX-5B-I2V**(5.57B)로 대체해, **우리 slam_seq 프레임 1장**을 컨텍스트로 49프레임 미래영상을 생성했다. 합성 테이블탑은 범용 영상모델에 OOD인데도 블록·실린더 배치를 **시간적으로 일관되게** 유지한다(파운데이션 스케일의 사실성). 행동조건·예측형 파운데이션 버킷은 W9(V-JEPA 2-AC)가 이미 담당.
+
+<img src="_static/wm_cogvideox_gen.gif" alt="CogVideoX generated future video from our slam_seq frame" style="width:100%;max-width:520px;border-radius:8px"><br>
+<em>↑ 우리 slam_seq 프레임 1장만 주고 5.57B 모델이 생성한 49프레임 미래영상(합성 장면이라 OOD인데도 블록·실린더 배치가 일관).</em>
 
 <img src="_static/wm_cogvideox.png" alt="CogVideoX-5B image-to-video future prediction from our slam_seq frame" style="width:100%;max-width:1100px;border-radius:8px">
 
