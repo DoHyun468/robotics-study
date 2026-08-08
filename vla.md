@@ -141,4 +141,20 @@ conda run -n ov bash _wsl/run_ov_eval.sh   # openvla-7b-finetuned-libero-spatial
 
 **④ 품질 자동 필터.** 에피소드별로 성공(리프트) · action jerk(smoothness) · IK feasibility를 측정해 자동 필터링. 일부러 섞은 **그리퍼 폭(72mm) 초과 파지(비실현 retargeting) 4개가 리프트 실패 → 자동 드롭**, 12/16 keep. 위 대시보드의 workspace coverage에 kept(초록)/dropped(빨강)로 표시된다 — "나쁜 시연을 걸러내는" 데이터 품질 게이트.
 
-정직한 경계: sim 시연(합성)·소규모 데모 파이프라인이다. 실제 대규모 실사 human 비디오, 다관절 dexterous retargeting, RLDS/Open-X 표준 직렬화는 다음 확장. 그래도 **"human 의도 → 로봇 실행 → (obs, instruction, action) 학습샘플 + 증강 + inpainting + 자동 품질필터"**라는 파이프라인 뼈대와 각 단계를 GT로 측정 가능하게 구현했다. 코드: `src/vla_datapipe.py`.
+### ⑤ 확장 A — 실제 human 비디오에서 시연자 제거 (Meta HOT3D)
+
+위 sim2real이 합성 배경 랜덤화였다면, 여기선 **실제 egocentric human 영상(Meta HOT3D)**에서 시연자를 지운다. HOT3D가 주는 2D 손 랜드마크(uv)로 손+팔 마스크를 만들고 **cv2 inpaint(Telea)**로 제거 → 사람 손이 사라진 **장면 중심 프레임**을 얻는다. human 데몬은 *사람* 손을 보여주지만 로봇 정책엔 *장면/자기 임베디먼트*가 필요하므로, 시연자 제거는 human-demo → robot-learning 파이프라인의 실제 전처리 단계다.
+
+<img src="_static/vla_demorm.png" alt="demonstrator removal on real HOT3D via landmark mask + inpaint" style="width:100%;max-width:1000px;border-radius:8px">
+
+정직: 마스크는 HOT3D 손 주석(학습 세그멘터 아님), inpaint는 고전적(Telea) — 전처리 실증이지 SOTA 영상 inpainting은 아니다(프레임당 주석된 한 손만 마스킹). 코드 `src/vla_demonstrator_removal.py`.
+
+### ⑥ 확장 B — RLDS / Open-X 표준 직렬화 + action 정규화 통계
+
+ad-hoc npz를 **OpenVLA/Octo가 실제로 먹을 수 있는** RLDS(Open-X-Embodiment) 스키마로 변환한다: step마다 `observation.image/state · action(world_vector3+rotation_delta3+gripper1) · reward · discount · is_first/last/terminal · language_instruction`. 그리고 OpenVLA가 action을 $[-1,1]$로 정규화할 때 쓰는 **per-dim q01/q99 통계(`dataset_statistics.json`)**를 산출한다(gripper는 비정규화). 로더가 shard를 다시 읽어 **스키마 conformance를 검증(PASS)** — 16 궤적·1616 transition.
+
+<img src="_static/vla_rlds.png" alt="RLDS/Open-X features schema + action normalization q01/q99 stats" style="width:100%;max-width:1150px;border-radius:8px">
+
+정직: TF 없이 스키마-준수 npz+json로 내보냈다(TF 박스의 TFDS 빌더에 그대로 투입해 tfrecord화 가능). 코드 `src/vla_rlds_export.py`.
+
+정직한 경계(전체): sim 시연·소규모지만, JD 4번째 담당업무의 **자동 변환 · sim2real 증강 · (실데이터) inpainting · 품질필터 · 표준 직렬화**를 전부 실측 구현했다. 남은 확장: 실제 대규모 human 비디오 스케일업, dexterous 다관절 retargeting 데이터. 코드: `src/vla_datapipe.py`(+`vla_demonstrator_removal.py`, `vla_rlds_export.py`).
