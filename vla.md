@@ -157,4 +157,13 @@ ad-hoc npz를 **OpenVLA/Octo가 실제로 먹을 수 있는** RLDS(Open-X-Embodi
 
 정직: TF 없이 스키마-준수 npz+json로 내보냈다(TF 박스의 TFDS 빌더에 그대로 투입해 tfrecord화 가능). 코드 `src/vla_rlds_export.py`.
 
-정직한 경계(전체): sim 시연·소규모지만, JD 4번째 담당업무의 **자동 변환 · sim2real 증강 · (실데이터) inpainting · 품질필터 · 표준 직렬화**를 전부 실측 구현했다. 남은 확장: 실제 대규모 human 비디오 스케일업, dexterous 다관절 retargeting 데이터. 코드: `src/vla_datapipe.py`(+`vla_demonstrator_removal.py`, `vla_rlds_export.py`).
+### ⑦ 확장 C — Dexterous(16-DoF) VLA 데이터 (Allegro)
+
+앞의 파이프라인은 **평행 그리퍼(action=ΔEE+1)**였다. 실제 dexterous 텔레오퍼레이션/리타게팅([HM5 MANO→Allegro](human_pose.md))은 훨씬 큰 action 공간이 필요하다. MuJoCo **mjSpec**으로 Allegro 손+테이블+물체+카메라를 조립하고, human식 pre-shape → power-grasp를 **16개 손가락 관절**로 생성해 VLA 에피소드를 만든다 — 동일한 증강·품질·포맷 machinery에 얹되 **action 차원이 7 → 16**으로 커진다.
+
+<img src="_static/vla_dex.png" alt="dexterous 16-DoF Allegro VLA data: grasp obs + 16-joint action trace + joint heatmap" style="width:100%;max-width:1150px;border-radius:8px">
+
+- 8 에피소드, within-limits **100%**, finger jerk ~0.010(스무딩), 관절-상태 히트맵이 open→power grasp로 램프.
+- 정직: 키네매틱 replay(물리 파지성공 아님)이고 grasp 관절타깃은 HM5식 power-grasp를 Allegro 한계 내로 생성(MANO가 이 머신에 없어 전체 retarget 재실행은 못 함). 요점은 **dexterous 16-DoF action 공간과 그 데이터 파이프라인**. 코드 `src/vla_datapipe_dexterous.py`.
+
+정직한 경계(전체): sim 시연·소규모지만, JD 4번째 담당업무의 **자동 변환 · sim2real 증강 · (실데이터) inpainting · 품질필터 · 표준 직렬화 · dexterous(16-DoF) action**을 전부 실측 구현했다. 남은 확장: 실제 대규모 human 비디오 스케일업. 코드: `src/vla_datapipe.py`(+`vla_demonstrator_removal.py`, `vla_rlds_export.py`, `vla_datapipe_dexterous.py`).
