@@ -166,4 +166,13 @@ ad-hoc npz를 **OpenVLA/Octo가 실제로 먹을 수 있는** RLDS(Open-X-Embodi
 - 8 에피소드, within-limits **100%**, finger jerk ~0.010(스무딩), 관절-상태 히트맵이 open→power grasp로 램프.
 - 정직: 키네매틱 replay(물리 파지성공 아님)이고 grasp 관절타깃은 HM5식 power-grasp를 Allegro 한계 내로 생성(MANO가 이 머신에 없어 전체 retarget 재실행은 못 함). 요점은 **dexterous 16-DoF action 공간과 그 데이터 파이프라인**. 코드 `src/vla_datapipe_dexterous.py`.
 
-정직한 경계(전체): sim 시연·소규모지만, JD 4번째 담당업무의 **자동 변환 · sim2real 증강 · (실데이터) inpainting · 품질필터 · 표준 직렬화 · dexterous(16-DoF) action**을 전부 실측 구현했다. 남은 확장: 실제 대규모 human 비디오 스케일업. 코드: `src/vla_datapipe.py`(+`vla_demonstrator_removal.py`, `vla_rlds_export.py`, `vla_datapipe_dexterous.py`).
+### ⑧ 확장 D — 실제 human 비디오 스케일업 (Meta HOT3D, 다중 시퀀스)
+
+A/B/C가 단일 클립·sim이었다면, 여기선 로컬 가용 **HOT3D 실제 시퀀스 5개(74프레임·69 transition)**를 배치로 VLA 데이터화한다. 프레임마다 — obs = 실제 egocentric 프레임(+시연자 제거 variant), state = 손목 3D(`lm_cam`)+hand openness, **action = Δwrist(3)+Δopenness(1) — 실제 영상에서 뽑은 human action**(Human→Robot 리타게터가 소비할 바로 그 신호), instruction = HOT3D 객체 라벨(bottle/keyboard/mouse…). 실제 human 모션 분포로 정규화 통계를 산출한다.
+
+<img src="_static/vla_realvideo.png" alt="real HOT3D multi-sequence to VLA, with demonstrator-removed variants" style="width:100%;max-width:1150px;border-radius:8px">
+<img src="_static/vla_realvideo_stats.png" alt="real human action distribution (wrist speed, openness change) from HOT3D" style="width:100%;max-width:1000px;border-radius:8px">
+
+정직: 로컬 HOT3D는 소규모(전체 833분 중 일부) — **파이프라인이 스케일하는 것**이지 데이터가 대규모는 아니다. action은 3D 랜드마크 기반 human 손 모션 proxy(로봇 실행 아님). 코드 `src/vla_realvideo_pipeline.py`.
+
+정직한 경계(전체): sim/실데이터·소규모지만, JD 4번째 담당업무의 **자동 변환 · sim2real 증강 · (실데이터) inpainting · 품질필터 · 표준 직렬화 · dexterous(16-DoF) action · 실영상 다중시퀀스 스케일업**을 전부 실측 구현했다. 남은 것: 실제 대규모(수십 시간) 데이터 확보와 로봇 실행 검증. 코드: `src/vla_datapipe.py`(+`vla_demonstrator_removal.py`, `vla_rlds_export.py`, `vla_datapipe_dexterous.py`, `vla_realvideo_pipeline.py`).
