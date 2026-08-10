@@ -163,8 +163,8 @@ ad-hoc npz를 **OpenVLA/Octo가 실제로 먹을 수 있는** RLDS(Open-X-Embodi
 
 <img src="_static/vla_dex.png" alt="dexterous 16-DoF Allegro VLA data — grasp obs, 16-joint action trace, joint heatmap" style="width:100%;max-width:1150px;border-radius:8px">
 
-- 8 에피소드, within-limits **100%**, finger jerk ~0.010(스무딩), 관절-상태 히트맵이 open→power grasp로 램프.
-- 정직: 키네매틱 replay(물리 파지성공 아님)이고 grasp 관절타깃은 HM5식 power-grasp를 Allegro 한계 내로 생성(MANO가 이 머신에 없어 전체 retarget 재실행은 못 함). 요점은 **dexterous 16-DoF action 공간과 그 데이터 파이프라인**. 코드 `src/vla_datapipe_dexterous.py`.
+- 8 에피소드, within-limits **100%**, finger jerk ~0.010, **접촉 물리로 손가락이 큐브 표면에서 멈춤**(잔여 침투 ~2–3mm) — 관통 아님.
+- 정직: position 액추에이터+`mj_step`으로 **접촉 존중 닫힘**(2mm 접촉 시 freeze)이라 손가락이 표면에서 멈춘다(자유 키네매틱 pose로 뚫고 지나가지 않음). grasp 타깃은 HM5식 config를 Allegro 한계 내로(MANO가 이 머신에 없어 전체 retarget 재실행은 못 함). 요점은 **dexterous 16-DoF action 공간 + 데이터 파이프라인**. 코드 `src/vla_datapipe_dexterous.py`.
 
 ### ⑧ 확장 D — 실제 human 비디오 스케일업 (Meta HOT3D, 다중 시퀀스)
 
