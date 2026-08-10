@@ -593,7 +593,7 @@ $$e=\begin{bmatrix} x^\star_{\text{pos}}-x_{\text{pos}}\\[2pt] \log\!\big(R^\sta
 
 ($\lambda$ 감쇠항이 특이점(singularity) 근처에서 해를 안정화한다.) 팔이 $x^\star$에 도달하면 **손가락을 §11.11 grasp으로 닫는다.**
 
-<img src="_static/hm5f_armik2.png" alt="arm IK mounting the synthesized grasp on a Franka arm, end-to-end" style="width:100%;max-width:1280px;border-radius:8px">
+<img src="_static/hm5f_armik3.png" alt="arm IK mounting the synthesized grasp on a Franka arm, end-to-end" style="width:100%;max-width:1280px;border-radius:8px">
 
 *좌=Franka 7-DoF 팔 + Allegro가 테이블 위 mug로 내려가 grasp 자세 도달(IK). 중=실행된 grasp 근접(빨간•=접촉점, force-closure ✔). 우=DLS IK 수렴 곡선 — 위치 오차 254mm→0.*
 
