@@ -597,6 +597,12 @@ $$e=\begin{bmatrix} x^\star_{\text{pos}}-x_{\text{pos}}\\[2pt] \log\!\big(R^\sta
 
 *좌=Franka 7-DoF 팔 + Allegro가 테이블 위 mug로 내려가 grasp 자세 도달(IK). 중=실행된 grasp 근접(빨간•=접촉점, force-closure ✔). 우=DLS IK 수렴 곡선 — 위치 오차 254mm→0.*
 
+**왜 손이 물체를 파고들 수 있었나 — 침투 패널티가 '본' 점들.** grasp 합성의 침투 방지 항(DexGraspNet식 $E_\text{pen}$)은 손을 **13개 링크 '원점' 점**으로만 샘플링했다(아래 좌). 특히 **넓적한 손바닥 전체가 점 1개(마젠타)** — 이 원점 하나만 물체 밖에 있으면 패널티가 0이라, 손바닥·링크의 '표면'은 mug 속으로 들어가도 목적함수가 못 봤다. 이게 palm 관통의 근본 원인이었고, 보고되던 "침투 2mm"도 같은 13점 기준이라 렌더(전체 메시)와 어긋났다. 수정 방향: 손 표면을 **조밀 샘플(아래 우, 231점: palm+모든 링크)**로 바꿔 최적화 침투항과 측정에 함께 사용 → 표면까지 물체 밖으로 밀어내는 grasp가 나오고 침투 수치도 정직해진다.
+
+<img src="_static/hm5f_handpoints.png" alt="sparse 13 link-origin points (palm=1 point) vs dense hand-surface sample" style="width:100%;max-width:1000px;border-radius:8px">
+
+*좌=옛 침투항이 본 13개 링크 원점(마젠타=손바닥 전체가 1점, 노랑=손가락 링크 원점) — 표면을 거의 못 덮는다. 우=새 조밀 표면 샘플(231점)로 palm·링크까지 커버.*
+
 | 지표 | 값 |
 |---|---|
 | IK 위치 잔차 | **≈ 0.0 mm** (254mm에서 수렴) |
