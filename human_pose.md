@@ -647,3 +647,60 @@ MUJOCO_GL=osmesa python src/hm5d_graspsyn.py                    # §11.10 grasp 
 MUJOCO_GL=osmesa python src/hm5e_6dof.py                        # §11.11 6-DoF 손배치 + 목적함수(gap vs ε) 비교
 MUJOCO_GL=osmesa python src/hm5f_armik.py                       # §11.12 Franka+Allegro 합성 + arm IK 실행
 ```
+
+## 12. Human 시연 → RLDX-1 학습데이터 (LeRobot v2.1) — 데이터 엔진 완결
+
+§10–11이 "사람 손을 로봇 손으로"였다면, 이 절은 그 시연을 **실제 로봇 파운데이션 모델(RLWRLD RLDX-1)이 먹는 포맷**으로 직렬화한다. RLDX-1 기술보고서는 "사람 손 리타게팅으로 시간당 200+ 시연 수집"을 데이터 엔진의 축으로 쓰고, 학습 입력은 **LeRobot v2.1**이다 — 정확히 이 파이프라인의 산업 버전.
+
+```text
+human demo (MANO 손 intent: aperture·yaw·target)          [§10 리타게팅]
+   └→ MuJoCo Franka 실행 + 기록: obs(256²RGB), proprio(7q+grip), action(7=Δee+grip)
+        └→ 품질 필터: 성공/관절한계/jerk/IK  (16개 → 12개 통과)
+             └→ LeRobot v2.1 직렬화: data/*.parquet + videos/*.mp4(h264)
+                  + meta/{info,episodes,tasks,modality,stats}.json
+                       └→ 검증: RLDX-1 자체 로더(LeRobotEpisodeLoader)가 로드  ← 여기가 증명
+```
+
+### 스키마 — RLDX가 요구하는 그대로
+
+RLDX 로더는 LeRobot 표준 meta에 **`modality.json`**(자체 확장)을 더해, `observation.state`/`action` 배열 컬럼을 의미 단위로 슬라이스한다. 우리 매핑:
+
+| modality | key | 슬라이스 | 의미 |
+|---|---|---|---|
+| state | `joint_pos` | [0:7] | Franka 관절각 7 |
+| state | `gripper` | [7:8] | 그리퍼 개도(0–1) |
+| action | `eef_pos_delta` | [0:3] | Δxyz (EE) |
+| action | `eef_rot_delta` | [3:6] | Δ회전 (yaw 축 사용) |
+| action | `gripper_close` | [6:7] | 그리퍼 명령 |
+| video | `front_view` | — | `observation.images.front_view` mp4 |
+| annotation | `human.action.task_description` | — | `task_index` → tasks.jsonl 문장 |
+
+`stats.json`(정규화용 q01/q99 포함)은 **rldx 저장소의 `rldx/data/stats.py`로 생성** — 학습 시 액션 정규화까지 그들 코드 경로와 동일.
+
+### 품질 리포트 (수치는 전량 검증값)
+
+| 검사 | 결과 |
+|---|---|
+| 시연 수 | 16 생성 → **12 export** (성공률 필터; oversized-grasp 4 드롭) |
+| 관절 한계 여유 (min over traj) | **최소 28.0°** — 전 에피소드 한계 내 |
+| EE jerk (mean \|d³x/dt³\|) | **최대 0.0008** — 부드러운 실행 |
+| IK residual (max) | **최대 0.098 mm** |
+| 프레임/태스크 | 1,212 frames · 3 tasks (색상별 pick 지시) |
+
+<img src="_static/vla_lerobot_quality.png" alt="human demo to LeRobot v2.1 quality dashboard" style="width:100%; max-width:1200px;" />
+
+### 검증 — "그 회사 로더가 내 데이터를 읽는다"
+
+포맷 문서 준수가 아니라 **RLDX-1 저장소의 실제 학습 로더**(`rldx/data/dataset/lerobot_episode_loader.py`)를 검증기로 썼다:
+
+```text
+[validate] loader parsed meta: 12 episodes
+[validate] parquet via loader: state.joint_pos/gripper, action.eef_{pos,rot}_delta/gripper_close
+[validate] language[0] = 'pick up the red block'      (task_index → 문장 매핑)
+[validate] video via loader: front_view (2, 256, 256, 3) uint8
+LOADER_OK — RLDX-1 mid-training input schema satisfied.
+```
+
+코드: `robotics-lab/src/vla_lerobot_export.py`(직렬화+검증), `vla_lerobot_quality.py`(리포트). 
+
+**정직 캐비엇**: ① 12개 시뮬 시연 = 데이터 엔진의 **미니어처 증명**이지 스케일이 아니다(그들은 시간당 200+). ② 실 egocentric 손궤적(HOT3D, §11.4–11.7)의 동일 직렬화는 다음 단계 — 여기서는 시뮬 실행이 검증된 시연만 담았다. ③ 스케일업 레퍼런스: RLDX-1은 video 생성모델 증폭(합성 5×)으로 GR-1 벤치 +9.2%p를 보고 — 우리 확장 D(실비디오)와 같은 방향. ④ RLDX-1 가중치는 비상업 라이선스이며 본 데이터셋은 학습·연구 시연용.
