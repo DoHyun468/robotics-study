@@ -593,11 +593,11 @@ $$e=\begin{bmatrix} x^\star_{\text{pos}}-x_{\text{pos}}\\[2pt] \log\!\big(R^\sta
 
 ($\lambda$ 감쇠항이 특이점(singularity) 근처에서 해를 안정화한다.) 팔이 $x^\star$에 도달하면 **손가락을 §11.11 grasp으로 닫는다.**
 
-<img src="_static/hm5f_armik3.png" alt="arm IK mounting the synthesized grasp on a Franka arm, end-to-end" style="width:100%;max-width:1280px;border-radius:8px">
+<img src="_static/hm5f_armik4.png" alt="arm IK mounting the synthesized grasp on a Franka arm, end-to-end" style="width:100%;max-width:1280px;border-radius:8px">
 
 *좌=Franka 7-DoF 팔 + Allegro가 테이블 위 mug로 내려가 grasp 자세 도달(IK). 중=실행된 grasp 근접(빨간•=접촉점, force-closure ✔). 우=DLS IK 수렴 곡선 — 위치 오차 254mm→0.*
 
-**왜 손이 물체를 파고들 수 있었나 — 침투 패널티가 '본' 점들.** grasp 합성의 침투 방지 항(DexGraspNet식 $E_\text{pen}$)은 손을 **13개 링크 '원점' 점**으로만 샘플링했다(아래 좌). 특히 **넓적한 손바닥 전체가 점 1개(마젠타)** — 이 원점 하나만 물체 밖에 있으면 패널티가 0이라, 손바닥·링크의 '표면'은 mug 속으로 들어가도 목적함수가 못 봤다. 이게 palm 관통의 근본 원인이었고, 보고되던 "침투 2mm"도 같은 13점 기준이라 렌더(전체 메시)와 어긋났다. 수정 방향: 손 표면을 **조밀 샘플(아래 우, 231점: palm+모든 링크)**로 바꿔 최적화 침투항과 측정에 함께 사용 → 표면까지 물체 밖으로 밀어내는 grasp가 나오고 침투 수치도 정직해진다.
+**왜 손이 물체를 파고들 수 있었나 — 침투 패널티가 '본' 점들.** grasp 합성의 침투 방지 항(DexGraspNet식 $E_\text{pen}$)은 손을 **13개 링크 '원점' 점**으로만 샘플링했다(아래 좌). 특히 **넓적한 손바닥 전체가 점 1개(마젠타)** — 이 원점 하나만 물체 밖에 있으면 패널티가 0이라, 손바닥·링크의 '표면'은 mug 속으로 들어가도 목적함수가 못 봤다. 이게 palm 관통의 근본 원인이었고, 보고되던 "침투 2mm"도 같은 13점 기준이라 렌더(전체 메시)와 어긋났다. **수정·적용:** 손 표면을 **조밀 샘플(아래 우, palm+모든 링크)**로 바꿔 최적화 침투항($E_\text{pen}$)과 보고 metric에 함께 사용했다(속도는 KDTree 근사 signed-distance로 확보 — 조밀점을 trimesh proximity로 최적화 루프에 넣으면 수 시간 걸림). 결과: 재합성된 grasp에서 **palm까지 물체 밖으로 밀려나** mug가 똑바로 선 채 손가락이 옆을 감싸고, **손 전체 메시(6996점) 기준 침투 1.7mm**로 렌더와 일치하는 정직한 값이 된다(위 §11.12 그림).
 
 <img src="_static/hm5f_handpoints.png" alt="sparse 13 link-origin points (palm=1 point) vs dense hand-surface sample" style="width:100%;max-width:1000px;border-radius:8px">
 
