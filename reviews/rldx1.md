@@ -108,18 +108,20 @@ action과 물리 신호를 **동시에 디노이즈** — 접촉 동역학을 �
 
 FT-LIBERO 체크포인트를 **내 WSL2 + RTX 4090 + 기존 LIBERO 하네스**(OpenVLA 평가에 쓴 그 체크아웃, 같은 bddl/init-state 파일)에서 실측했다. 프로토콜은 내 OpenVLA 런과 동일: **공식 고정 init state(에피소드 k → init_states[k]) + 10-step settle, 태스크당 2 트라이얼(suite당 20ep), suite별 step 예산 220/280/300/520**. RLDX는 서버-클라이언트(zmq)로 띄우고 action chunk 16 중 8-step 실행. 입력은 각 모델의 네이티브 규약(RLDX: front+wrist 2뷰+state / OpenVLA: 3인칭 1뷰) — 기술보고서의 baseline 비교와 같은 방식이다.
 
-### 동일 조건 A/B (2026-08-11, n=20ep/suite)
+### 동일 조건 A/B + 확장 재현 런 (2026-08-11)
 
-| Suite | **RLDX-1-FT-LIBERO (내 실측)** | OpenVLA-7B-FT (내 실측, 동일 하네스) | RLDX 보고서 주장 (500ep) |
-|---|---|---|---|
-| Spatial | **95%** (19/20) | 80% | 98.0 |
-| Object | **100%** (20/20) | 85% | 99.3 |
-| Goal | **90%** (18/20) | 85% | 98.4 |
-| Long (libero_10) | **95%** (19/20) | 45% | 95.3 |
-| **평균** | **95.0%** | 73.75% | 97.8 |
+| Suite | OpenVLA-7B-FT (내 실측) | **RLDX-1 (내 실측, 20ep)** | **RLDX-1 (내 실측, 100ep)** | 보고서 주장 (500ep) |
+|---|---|---|---|---|
+| Spatial | 80% | 95% | **100.0%** | 98.0 |
+| Object | 85% | 100% | **99.0%** | 99.3 |
+| Goal | 85% | 90% | **93.0%** | 98.4 |
+| Long (libero_10) | 45% | 95% | **96.0%** | 95.3 |
+| **평균** | 73.75% | 95.0% | **97.0%** (388/400) | 97.8 |
+
+(20ep 런 = OpenVLA와 완전 동일 프로토콜의 A/B, 100ep 런 = 같은 고정-init 하네스로 표본만 5배 키운 재현 런.)
 
 읽는 법:
-- **주장이 내 셋업에서 대체로 재현된다**: 평균 95.0 vs 주장 97.8. 20ep 표본의 이항 잡음(±5%p 수준)과 프로토콜 차이(그들 공식 평가는 랜덤 리셋·500ep·다른 step 예산)를 감안하면 정합. Long은 95 vs 95.3으로 사실상 일치.
+- **주장이 내 셋업에서 재현된다**: 400ep 표본에서 **97.0 vs 주장 97.8** — Spatial/Object/Long은 오차 안에서 일치(100.0/99.0/96.0 vs 98.0/99.3/95.3). 유일하게 Goal(93.0 vs 98.4)이 5%p 낮은데, 실패가 특정 태스크에 몰려 있어(top-drawer+bowl, cream-cheese-in-bowl 등 4개) 프로토콜 차이(고정 init vs 랜덤 리셋, step 예산 300 vs 720)가 원인 후보다.
 - **격차의 위치가 논문 서사와 일치**: 짧은 suite에서 OpenVLA 대비 +10~15%p, **Long에서 +50%p** — "long-horizon으로 갈수록 벌어진다"(RC365 결과의 축소판)를 내 하네스에서 재확인.
 - **실패 4건은 전부 부분 실패(1/2)**: spatial `black_bowl_on_the_stove`(내 OpenVLA도 stove 계열에서 실패 — 겹치는 실패 모드), goal `top_drawer+bowl`·`cream_cheese_in_bowl`, long `mug_in_microwave_and_close`.
 - 결과 원본: `robotics-lab/outputs/rldx_ab_n2.json`(태스크별), 롤아웃 영상 80개 저장.

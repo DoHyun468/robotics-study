@@ -548,6 +548,11 @@ $$\min_{q,\;t_{\text{off}}}\; w_{\text{con}}\!\!\sum_{f\in\mathcal C}\big\lVert 
 위 "$E_{\text{pen}}$으로 관통 0mm"도 정확하지 않았다. 그 $E_{\text{pen}}$은 손의 **13개 링크 원점(중심점)** 만 물체 안에 있는지 봤기 때문에, 링크 **표면**이 mug를 파고드는 건 못 잡았다 — 링크 중심이 밖이어도 손가락·손바닥 표면은 여전히 들어간다. **손 충돌메시 정점을 조밀하게** 샘플해 mug 표면과의 signed distance로 다시 재니 **실제 표면 관통은 ~2.0mm**였다(13점 지표는 0.0mm). 물체를 손 밖으로 25mm까지 평행이동시켜도 관통은 2.0mm 그대로이고 force-closure만 깨진다 — 손이 mug를 **감싸는** 형태라 한 방향으로 밀면 반대쪽 링크가 더 파고들기 때문. 즉 이 **~2mm 관통은 4손가락 Allegro가 손 크기 mug를 쥘 때 grasp을 깨지 않고는 못 없애는 cross-morphology 잔차**(§11.9 벽의 또 다른 얼굴)다. 아래 표·그림·§11.11의 "0mm"는 **성긴 13점 지표 기준**이고, 정직한 **dense 실측은 ~2.0mm**다. **교훈: 최적화·검증 지표가 실제 물리량을 대표하지 못하면 "해결"이 허수가 된다 — 지표는 조밀하게, 렌더로 눈으로도 검증해야 한다.** (현재 §11.12 그림 제목에 dense 관통값을 명시함.)
 ```
 
+```{admonition} 3차 최종 정정 — dense 손점 지표도 벽 삼킴은 못 본다 (2026-08-11, §11.12에서 해결)
+:class: important
+위 "dense ~2mm"조차 과소측정이었다. 손 링크 solid 안에 들어간 **물체 벽 정점**으로 재니(부호 정확) 실제는 **9.7mm 벽 삼킴** — 이 mug는 벽만 있는 **열린 껍데기**라, 벽을 관통해 빈 속에 도달한 손점을 손점-기준 signed-distance가 "바깥"으로 오판하기 때문. 정석 수정은 **방향을 뒤집어**(물체 표면점 vs 손 링크 볼록껍질) 같은 항을 목적함수·평가·보고에 통일하는 것 — §11.12 참조. 최종: **재질 관통 0.0mm, 그 대가로 force-closure는 ε≈0 경계**(cross-morphology 트레이드오프의 정량적 종착점).
+```
+
 | 지표 (grasp-moment frame, 3지 precision) | §11.9 사람 접촉 복사 | §11.10 grasp 합성 |
 |---|---|---|
 | 손끝 → mug 표면 gap | 31.1 mm | **16.8 mm** |
@@ -593,11 +598,17 @@ $$e=\begin{bmatrix} x^\star_{\text{pos}}-x_{\text{pos}}\\[2pt] \log\!\big(R^\sta
 
 ($\lambda$ 감쇠항이 특이점(singularity) 근처에서 해를 안정화한다.) 팔이 $x^\star$에 도달하면 **손가락을 §11.11 grasp으로 닫는다.**
 
-<img src="_static/hm5f_armik4.png" alt="arm IK mounting the synthesized grasp on a Franka arm, end-to-end" style="width:100%;max-width:1280px;border-radius:8px">
+<img src="_static/hm5f_armik5.png" alt="arm IK mounting the synthesized grasp on a Franka arm, end-to-end" style="width:100%;max-width:1280px;border-radius:8px">
 
-*좌=Franka 7-DoF 팔 + Allegro가 테이블 위 mug로 내려가 grasp 자세 도달(IK). 중=실행된 grasp 근접(빨간•=접촉점, force-closure ✔). 우=DLS IK 수렴 곡선 — 위치 오차 254mm→0.*
+*좌=Franka 7-DoF 팔 + Allegro가 테이블 위 mug로 내려가 grasp 자세 도달(IK). 중=실행된 grasp 근접(빨간•=접촉점) — 재질 관통 0.0mm. 우=DLS IK 수렴 곡선 — 위치 오차 284mm→0.*
 
-**왜 손이 물체를 파고들 수 있었나 — 침투 패널티가 '본' 점들.** grasp 합성의 침투 방지 항(DexGraspNet식 $E_\text{pen}$)은 손을 **13개 링크 '원점' 점**으로만 샘플링했다(아래 좌). 특히 **넓적한 손바닥 전체가 점 1개(마젠타)** — 이 원점 하나만 물체 밖에 있으면 패널티가 0이라, 손바닥·링크의 '표면'은 mug 속으로 들어가도 목적함수가 못 봤다. 이게 palm 관통의 근본 원인이었고, 보고되던 "침투 2mm"도 같은 13점 기준이라 렌더(전체 메시)와 어긋났다. **수정·적용:** 손 표면을 **조밀 샘플(아래 우, palm+모든 링크)**로 바꿔 최적화 침투항($E_\text{pen}$)과 보고 metric에 함께 사용했다(속도는 KDTree 근사 signed-distance로 확보 — 조밀점을 trimesh proximity로 최적화 루프에 넣으면 수 시간 걸림). 결과: 재합성된 grasp에서 **palm까지 물체 밖으로 밀려나** mug가 똑바로 선 채 손가락이 옆을 감싸고, **손 전체 메시(6996점) 기준 침투 1.7mm**로 렌더와 일치하는 정직한 값이 된다(위 §11.12 그림).
+**관통의 근본 원인은 두 겹이었다 — 그리고 정석 수정.** ① **샘플 부족**: 침투 항($E_\text{pen}$)이 손을 **13개 링크 원점**(손바닥=1점, 아래 좌)으로만 봐서 링크 '표면'이 파고들어도 벌점이 없었다 → 조밀 표면 샘플(아래 우)로 교체. ② 그런데도 검지 링크가 컵 **벽을 9.7mm 삼키는** 관통이 남았다. 2차 원인은 더 근본적: 이 mug는 **벽만 있는 열린 껍데기**(non-watertight)라, 벽을 **관통해 반대편(빈 속)에 도달한** 손 표면점을 "가장 가까운 표면에서 바깥쪽 = 비관통"으로 오판한다 — 손점 기준 signed-distance로는 벽 삼킴을 원리적으로 못 본다. **정석 수정 = 방향 뒤집기(DexGraspNet식)**: "손 점이 물체 안인가?" 대신 **"물체 벽 표면점이 손 링크 solid(볼록껍질) 안인가?"** 를 벌점으로 쓴다. 링크 껍질은 watertight+볼록이라 face-plane 부호거리로 안/밖이 **정확**하고(전계산한 껍질 평면에 점-평면 내적만), 같은 측정을 합성 목적함수·후보 평가·최종 보고에 통일했다 — **최적화가 보는 것 = 보고되는 것 = 렌더**. 결과: **재질 관통 9.7mm → 0.0mm**(손 21개 링크·팔 링크 모두), 6각도 렌더에서 벽 절단 없음.
+
+**정직한 트레이드오프.** 진짜 비관통을 강제하자 이 cross-morphology grasp(사람 손 시연 → 더 작은 Allegro)의 force-closure 마진이 **ε ≈ 0(경계)** 까지 소진됐다 — §11.9에서 만난 morphology 벽의 정량적 종착점이다. "관통 없음"과 "넉넉한 force-closure"를 이 물체·이 손 조합에서 동시에 갖는 해는 이 시연 포즈 근방엔 없다: 컵을 손바닥에 **안는(cradle)** 형태로 수렴하고, 안정 마진은 경계값이다.
+
+<img src="_static/hm5f_diag6.png" alt="final grasp from 6 azimuths, zero material penetration" style="width:100%;max-width:1280px;border-radius:8px">
+
+*최종 grasp 6각도 검증 — 어느 각도에서도 벽 절단 없음. HAND 재질 관통 0.0mm, 팔 링크 vs mug 0.0mm.*
 
 <img src="_static/hm5f_handpoints.png" alt="sparse 13 link-origin points (palm=1 point) vs dense hand-surface sample" style="width:100%;max-width:1000px;border-radius:8px">
 
@@ -605,10 +616,10 @@ $$e=\begin{bmatrix} x^\star_{\text{pos}}-x_{\text{pos}}\\[2pt] \log\!\big(R^\sta
 
 | 지표 | 값 |
 |---|---|
-| IK 위치 잔차 | **≈ 0.0 mm** (254mm에서 수렴) |
+| IK 위치 잔차 | **≈ 0.0 mm** (284mm에서 수렴) |
 | IK 자세 잔차 | **0.0°** |
 | 팔 within joint limits | **100%** |
-| 실행된 grasp | gap 16.8mm · force-closure ε +0.031 ✔ · **물체 관통 0.0mm** |
+| 실행된 grasp | gap 19.4mm · force-closure **ε ≈ 0 (경계, marginal)** · **재질 관통 0.0mm** (벽 vs 링크 껍질, 손·팔 전체) |
 
 **핵심:** 7-DoF DLS IK가 팔 관절을 움직여 손바닥을 grasp 목표 자세에 **잔차 0**으로 가져다 놓고(관절限 100% 준수), 그 상태에서 손가락이 §11.11 grasp을 실행해 mug를 **force-closure로 쥔다.** 즉 §11.9에서 발견한 "손바닥 고정" 벽이 **실제 팔로 완전히 사라진다** — 팔이 손을 어디로든 가져갈 수 있으므로.
 
