@@ -81,6 +81,7 @@ parts:
           - file: reviews/pi0
           - file: reviews/rdt
           - file: reviews/gemini-robotics
+          - file: reviews/rldx1
       - file: reviews/humanmotion
         sections:
           - file: reviews/smpl-mano
