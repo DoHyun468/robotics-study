@@ -18,17 +18,19 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 | 벤치 | [DexBench](https://dexbench.org/en/) — 산업 dexterity 태스크 표준화 (§7) |
 | 보고서 | arXiv:2605.03269 (v2), 저자 68명 |
 
-## 2. 내 LIBERO 하네스 실측 — OpenVLA 동일조건 A/B + 400ep 재현
+## 2. 내 LIBERO 하네스 실측 — OpenVLA·RLDX-1·π0.5 **3-way** + 400ep 재현
 
 `RLDX-1-FT-LIBERO` 체크포인트를 **내 WSL2 + RTX 4090 + 기존 LIBERO 하네스**(OpenVLA 평가에 쓴 그 체크아웃, 같은 bddl/init-state 파일)에서 실측했다. 프로토콜은 내 OpenVLA 런과 동일: **공식 고정 init state(에피소드 k → init_states[k]) + 10-step settle, suite별 step 예산 220/280/300/520**. RLDX는 서버-클라이언트(zmq)로 띄우고 action chunk 16 중 8-step 실행. 입력은 각 모델의 네이티브 규약(RLDX: front+wrist 2뷰+state / OpenVLA: 3인칭 1뷰) — 기술보고서의 baseline 비교와 같은 방식이다.
 
-| Suite | OpenVLA-7B-FT (내 실측) | **RLDX-1 (내 실측, 20ep)** | **RLDX-1 (내 실측, 100ep)** | 주장 (500ep, 자체평가) |
-|---|---|---|---|---|
-| Spatial | 80% | 95% | **100.0%** | 98.0 |
-| Object | 85% | 100% | **99.0%** | 99.3 |
-| Goal | 85% | 90% | **93.0%** | 98.4 |
-| Long (libero_10) | 45% | 95% | **96.0%** | 95.3 |
-| **평균** | 73.75% | 95.0% | **97.0%** (388/400) | 97.8 |
+| Suite | OpenVLA-7B-FT | **RLDX-1 (20ep)** | **π0.5 (20ep)** | RLDX-1 (100ep) | RLDX 주장 | π0.5 주장 |
+|---|---|---|---|---|---|---|
+| Spatial | 80% | 95% | 90% | **100.0%** | 98.0 | — |
+| Object | 85% | 100% | 100% | 99.0% | 99.3 | — |
+| Goal | 85% | 90% | **100%** | 93.0% | 98.4 | — |
+| Long (libero_10) | 45% | 95% | 95% | 96.0% | 95.3 | — |
+| **평균** | 73.75% | 95.0% | **96.2%** (77/80) | **97.0%** (388/400) | 97.8 | 96.85 |
+
+(모든 "내 실측" 열 = 같은 고정-init 하네스·같은 step 예산. π0.5 = `lerobot/pi05-libero`(HF 재현판), 각 모델은 자기 네이티브 입력 규약. "주장"은 각사 자체평가 — RLDX 500ep, π0.5는 lerobot 재현판 공칭.)
 
 (20ep 런 = OpenVLA와 완전 동일 프로토콜의 A/B — 태스크당 2 트라이얼. 100ep 런 = 같은 고정-init 하네스로 표본만 5배 키운 재현 런 — 태스크당 10 트라이얼, 총 400 에피소드.)
 
@@ -36,7 +38,8 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 - **주장이 내 셋업에서 재현된다**: 400ep 표본에서 **97.0 vs 주장 97.8** — Spatial/Object/Long은 오차 안에서 일치(100.0/99.0/96.0 vs 98.0/99.3/95.3). 유일하게 Goal(93.0 vs 98.4)이 5%p 낮은데, 실패가 특정 태스크에 몰려 있어(top-drawer+bowl, cream-cheese-in-bowl 등 4개) 프로토콜 차이(고정 init vs 랜덤 리셋, step 예산 300 vs 720)가 원인 후보다.
 - **격차의 위치가 논문 서사와 일치**: 짧은 suite에서 OpenVLA 대비 +10~15%p, **Long에서 +50%p** — "long-horizon으로 갈수록 벌어진다"(RC365 결과의 축소판)를 내 하네스에서 재확인.
 - **20ep 런의 실패 4건은 전부 부분 실패(1/2)**: spatial `black_bowl_on_the_stove`(내 OpenVLA도 stove 계열에서 실패 — 겹치는 실패 모드), goal `top_drawer+bowl`·`cream_cheese_in_bowl`, long `mug_in_microwave_and_close`.
-- 결과 원본: `robotics-lab/outputs/rldx_ab_n2.json`·`rldx_ab_n10.json`(태스크별), 롤아웃 영상 480개 저장.
+- 결과 원본: `robotics-lab/outputs/rldx_ab_n2.json`·`rldx_ab_n10.json`·`pi05_ab_n2.json`(태스크별), 롤아웃 영상 560개 저장.
+- **3-way 판독**: 두 프론티어 모두 자기 주장 수치를 내 하네스에서 재현했다(RLDX 97.8→97.0, π0.5 96.85→96.2). **서열(97.8 vs 96.9)은 내 표본에선 통계적으로 분리 불가** — 사실상 LIBERO 포화 동률이고, 구세대 OpenVLA와의 격차(특히 Long +50%p)가 진짜 신호다. 태스크 레벨 교차: 마지막 실패가 **두 모델 모두 같은 태스크**(mug-in-microwave+close 1/2), 반면 RLDX가 반복 실패한 Goal 2태스크(top-drawer+bowl, cream-cheese)는 π0.5가 만점 — 모델별 약점 프로파일이 다르다.
 
 <!-- rldx-demo-media -->
 
@@ -133,6 +136,91 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/failures/libero_object__pick_up_the_ketchup_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">libero object · pick up the ketchup and place it in the basket</figcaption></figure>
 </div>
 
+
+### π0.5 시연 — 전 미션 40/40 (같은 하네스 롤아웃 원본)
+
+각 프레임 좌=front, 우=wrist. RLDX 시연(위)과 같은 고정 init 에피소드라 **같은 태스크·같은 시작 배치를 두 모델이 어떻게 다르게 푸는지** 나란히 볼 수 있다.
+
+**Spatial (π0.5)**
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl between the plate and the ramekin and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl from table center and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl in the top drawer of the wooden cabinet and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl next to the cookie box and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl next to the plate and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl next to the ramekin and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl on the cookie box and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl on the ramekin and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl on the stove and place it on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_spatial/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl on the wooden cabinet and place it on the plate</figcaption></figure>
+</div>
+
+<details><summary><b>Spatial — π0.5 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_pi05_libero_spatial.png" alt="pi05 libero_spatial filmstrip" style="width:100%;border-radius:8px;margin-top:8px" /></details>
+
+**Object (π0.5)**
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_alphabet_soup_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the alphabet soup and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_bbq_sauce_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the bbq sauce and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_butter_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the butter and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_chocolate_pudding_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the chocolate pudding and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_cream_cheese_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the cream cheese and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_ketchup_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the ketchup and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_milk_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the milk and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_orange_juice_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the orange juice and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_salad_dressing_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the salad dressing and place it in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_object/pick_up_the_tomato_sauce_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the tomato sauce and place it in the basket</figcaption></figure>
+</div>
+
+<details><summary><b>Object — π0.5 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_pi05_libero_object.png" alt="pi05 libero_object filmstrip" style="width:100%;border-radius:8px;margin-top:8px" /></details>
+
+**Goal (π0.5)**
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/open_the_middle_drawer_of_the_cabinet.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">open the middle drawer of the cabinet</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/open_the_top_drawer_and_put_the_bowl_inside.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">open the top drawer and put the bowl inside</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/push_the_plate_to_the_front_of_the_stove.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">push the plate to the front of the stove</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/put_the_bowl_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the bowl on the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/put_the_bowl_on_the_stove.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the bowl on the stove</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/put_the_bowl_on_top_of_the_cabinet.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the bowl on top of the cabinet</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/put_the_cream_cheese_in_the_bowl.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the cream cheese in the bowl</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/put_the_wine_bottle_on_the_rack.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the wine bottle on the rack</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/put_the_wine_bottle_on_top_of_the_cabinet.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the wine bottle on top of the cabinet</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_goal/turn_on_the_stove.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">turn on the stove</figcaption></figure>
+</div>
+
+<details><summary><b>Goal — π0.5 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_pi05_libero_goal.png" alt="pi05 libero_goal filmstrip" style="width:100%;border-radius:8px;margin-top:8px" /></details>
+
+**Long (π0.5)**
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">KITCHEN SCENE3 turn on the stove and put the moka pot on it</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">KITCHEN SCENE4 put the black bowl in the bottom drawer of the cabinet and close it</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">KITCHEN SCENE6 put the yellow and white mug in the microwave and close it</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">KITCHEN SCENE8 put both moka pots on the stove</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">LIVING ROOM SCENE1 put both the alphabet soup and the cream cheese box in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">LIVING ROOM SCENE2 put both the alphabet soup and the tomato sauce in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">LIVING ROOM SCENE2 put both the cream cheese box and the butter in the basket</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">LIVING ROOM SCENE5 put the white mug on the left plate and put the yellow and white mug on the right plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">LIVING ROOM SCENE6 put the white mug on the plate and put the chocolate pudding to the right of the plate</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">STUDY SCENE1 pick up the book and place it in the back compartment of the caddy</figcaption></figure>
+</div>
+
+<details><summary><b>Long — π0.5 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_pi05_libero_10.png" alt="pi05 libero_10 filmstrip" style="width:100%;border-radius:8px;margin-top:8px" /></details>
+
+**π0.5 실패 사례 (전체 3건 전부)** — spatial top-drawer 2건 + long mug-in-microwave 1건:
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/failures/libero_10__KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it__ep0-failure.mp4"></video><figcaption style="font-size:0.7rem;line-height:1.25">libero 10 · KITCHEN SCENE6 put the yellow and white mug in the microwave and close it · ep0-failure</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/failures/libero_spatial__pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate__ep0-failure.mp4"></video><figcaption style="font-size:0.7rem;line-height:1.25">libero spatial · pick up the black bowl in the top drawer of the wooden cabinet and place it on the plate · ep</figcaption></figure>
+<figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/pi05/failures/libero_spatial__pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate__ep1-failure.mp4"></video><figcaption style="font-size:0.7rem;line-height:1.25">libero spatial · pick up the black bowl in the top drawer of the wooden cabinet and place it on the plate · ep</figcaption></figure>
+</div>
+
 ## 3. GR-1 Tabletop 실측 — 덱스터러스 핸드 휴머노이드
 
 "RLDX는 손 매니퓰레이터 전용인가?"에 대한 실측 답. LIBERO(그리퍼)와 달리 여기는 **Fourier GR-1 휴머노이드 — 양팔 + 덱스터러스 핸드, ego-centric 카메라** — 의 시뮬 벤치(24태스크: 물체 재배치 18 + 여닫이 6)다. `RLDX-1-FT-GR1` 체크포인트, 그들 평가 프로토콜 그대로(랜덤 리셋, 720 step, chunk 16), 태스크당 3 에피소드.
@@ -199,6 +287,7 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 - **flash-attn 벽**: 표준 설치 경로가 CUDA toolkit(nvcc) 전제의 소스 빌드. nvcc 없는 WSL에서는 커뮤니티 프리빌트 휠(`2.7.4.post1+cu126torch2.7`)로 우회해야 했다.
 - **`setup_libero.sh`는 그대로는 안 돈다**: ① cmake 4.x가 구식 egl-probe를 거부(`CMAKE_POLICY_VERSION_MINIMUM=3.5` 필요) ② 스크립트가 고정한 transformers 4.51.3에는 `masking_utils`가 없어 자기 자신(rldx 패키지)을 import 못 한다(→4.57.0으로 상향) ③ diffusers/accelerate가 클라이언트 venv에 누락 ④ 무핀 mujoco가 3.11로 풀려 robosuite 1.4의 `MjData.qM` 접근이 깨진다(→내 검증 조합 mujoco 2.3.2로 고정). — 대기업 공개 레포도 환경 재현은 이만큼 깨지기 쉽다는 표본.
 - **평가 프로토콜 차이 발견**: 그들의 LIBERO 래퍼는 에피소드마다 **랜덤 초기 배치**로 리셋한다(공식 LIBERO/OpenVLA 프로토콜은 벤치마크 고정 init state). A/B 공정성을 위해 고정-init 옵션을 패치로 추가했다(기본 동작 불변, `RLDX_FIXED_INIT=1`, `robotics-lab/wsl/rldx_fixed_init_patch.py`).
+- **π0.5(lerobot) 통합 전투 6건**: ① lerobot pi05는 **패치판 transformers 포크**(`fix/lerobot_openpi` 브랜치) 필수 — pyproject의 `pi` extra가 git 직링크라 **PyPI 휠 메타데이터에서 증발**해 스스로 찾아야 했다 ② PaliGemma 토크나이저가 **gated repo**(라이선스 동의+토큰) ③ LIBERO init-state 파일을 신형 torch가 `weights_only=True`로 거부 ④ lerobot eval은 벡터 env 전제라 **관측에 배치 차원** 필요 ⑤ **numpy 2.x가 mujoco 2.3.2 텍스처를 조용히 손상**(초록 노이즈 팔 — 렌더 확인 안 했으면 오염된 입력으로 불공정 평가할 뻔) ⑥ `pi05_libero_base`는 커뮤니티 zero-success 리포트(#2533)가 있는 체크포인트 — 내 하네스에서도 1/4 수준이었고, HF 6k-step 재현판(`pi05-libero`)으로 바꾸자 스모크 4/4·본런 96.2%(신형 lerobot 학습 플래그 3개를 config에서 제거해 0.4.2 로드).
 - **torchcodec ↔ FFmpeg 8 비호환**(§4에서 만남): torchcodec 0.4는 Ubuntu 26.04의 libavutil 60을 못 연다 — RLDX 로더가 1급 지원하는 opencv 백엔드로 대체.
 
 ## 6. Human 시연 → RLDX-1 학습데이터 (LeRobot v2.1)
