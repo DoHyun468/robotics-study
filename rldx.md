@@ -42,13 +42,10 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 
 ### 시연 — 전 미션 40/40 태스크 (실측 롤아웃 원본)
 
-아래는 위 400ep 런에서 저장된 롤아웃 영상 원본이다(각 프레임 좌=front view, 우=wrist view — 모델이 실제로 본 두 입력). **suite별 필름스트립**(태스크 10개 × 진행 5컷)으로 전 미션을 한눈에, **접이식 그리드**에서 태스크별 영상을 재생할 수 있다.
+아래는 위 400ep 런에서 저장된 롤아웃 영상 원본이다(각 프레임 좌=front view, 우=wrist view — 모델이 실제로 본 두 입력). **태스크별 영상**을 바로 재생할 수 있고(클릭·자동 미리불러오기 없음), suite별 **필름스트립 사진**(태스크 10 × 진행 5컷)은 토글 안에 있다.
 
 **Spatial**
 
-<img src="_static/rldx_strip_libero_spatial.png" alt="libero_spatial all-task filmstrip" style="width:100%;border-radius:8px" />
-
-<details><summary><b>Spatial — 10태스크 시연 영상 전체 (클릭)</b></summary>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:8px">
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl between the plate and the ramekin and place it on the plate</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl from table center and place it on the plate</figcaption></figure>
@@ -60,14 +57,15 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl on the ramekin and place it on the plate</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl on the stove and place it on the plate</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_spatial/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the black bowl on the wooden cabinet and place it on the plate</figcaption></figure>
-</div></details>
+</div>
+
+<details><summary><b>Spatial — 10태스크 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_libero_spatial.png" alt="libero_spatial all-task filmstrip" style="width:100%;border-radius:8px;margin-top:8px" />
+</details>
 
 
 **Object**
 
-<img src="_static/rldx_strip_libero_object.png" alt="libero_object all-task filmstrip" style="width:100%;border-radius:8px" />
-
-<details><summary><b>Object — 10태스크 시연 영상 전체 (클릭)</b></summary>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:8px">
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_object/pick_up_the_alphabet_soup_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the alphabet soup and place it in the basket</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_object/pick_up_the_bbq_sauce_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the bbq sauce and place it in the basket</figcaption></figure>
@@ -79,14 +77,15 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_object/pick_up_the_orange_juice_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the orange juice and place it in the basket</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_object/pick_up_the_salad_dressing_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the salad dressing and place it in the basket</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_object/pick_up_the_tomato_sauce_and_place_it_in_the_basket.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">pick up the tomato sauce and place it in the basket</figcaption></figure>
-</div></details>
+</div>
+
+<details><summary><b>Object — 10태스크 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_libero_object.png" alt="libero_object all-task filmstrip" style="width:100%;border-radius:8px;margin-top:8px" />
+</details>
 
 
 **Goal**
 
-<img src="_static/rldx_strip_libero_goal.png" alt="libero_goal all-task filmstrip" style="width:100%;border-radius:8px" />
-
-<details><summary><b>Goal — 10태스크 시연 영상 전체 (클릭)</b></summary>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:8px">
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_goal/open_the_middle_drawer_of_the_cabinet.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">open the middle drawer of the cabinet</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_goal/open_the_top_drawer_and_put_the_bowl_inside.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">open the top drawer and put the bowl inside</figcaption></figure>
@@ -98,14 +97,15 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_goal/put_the_wine_bottle_on_the_rack.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the wine bottle on the rack</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_goal/put_the_wine_bottle_on_top_of_the_cabinet.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">put the wine bottle on top of the cabinet</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_goal/turn_on_the_stove.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">turn on the stove</figcaption></figure>
-</div></details>
+</div>
+
+<details><summary><b>Goal — 10태스크 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_libero_goal.png" alt="libero_goal all-task filmstrip" style="width:100%;border-radius:8px;margin-top:8px" />
+</details>
 
 
 **Long (libero_10)**
 
-<img src="_static/rldx_strip_libero_10.png" alt="libero_10 all-task filmstrip" style="width:100%;border-radius:8px" />
-
-<details><summary><b>Long (libero_10) — 10태스크 시연 영상 전체 (클릭)</b></summary>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:8px">
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">KITCHEN SCENE3 turn on the stove and put the moka pot on it</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">KITCHEN SCENE4 put the black bowl in the bottom drawer of the cabinet and close it</figcaption></figure>
@@ -117,7 +117,11 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">LIVING ROOM SCENE5 put the white mug on the left plate and put the yellow and white mug on the right plate</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">LIVING ROOM SCENE6 put the white mug on the plate and put the chocolate pudding to the right of the plate</figcaption></figure>
 <figure style="margin:0"><video controls muted loop playsinline preload="none" style="width:100%;border-radius:6px" src="_static/rldx/libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy.mp4"></video><figcaption style="font-size:0.72rem;line-height:1.25">STUDY SCENE1 pick up the book and place it in the back compartment of the caddy</figcaption></figure>
-</div></details>
+</div>
+
+<details><summary><b>Long (libero_10) — 10태스크 필름스트립 사진 (클릭)</b></summary>
+<img src="_static/rldx_strip_libero_10.png" alt="libero_10 all-task filmstrip" style="width:100%;border-radius:8px;margin-top:8px" />
+</details>
 
 
 **실패 사례 (정직 표본)** — 12개 실패 중 4개: goal의 반복 실패 태스크(top-drawer+bowl, cream-cheese-in-bowl)와 object·long의 단발 실패. 접근·파지까지는 가고 배치/여닫기에서 무너지는 패턴.
