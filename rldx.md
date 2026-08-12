@@ -14,8 +14,8 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 |---|---|
 | 코드 | [github.com/RLWRLD/RLDX-1](https://github.com/RLWRLD/RLDX-1) — Apache-2.0, `uv` 기반, docs 5종 |
 | 가중치 | [huggingface.co/RLWRLD](https://huggingface.co/RLWRLD) — PT/PT-IMG(6.9B), MT-DROID/MT-ALLEX(8.1B), **FT-LIBERO**·FT-SIMPLER·FT-ROBOCASA·FT-GR1 등 11종 (비상업) |
-| 데이터 포맷 | **LeRobot v2.1** + 자체 `modality.json` 확장 (§5) |
-| 벤치 | [DexBench](https://dexbench.org/en/) — 산업 dexterity 태스크 표준화 (§6) |
+| 데이터 포맷 | **LeRobot v2.1** + 자체 `modality.json` 확장 (§6) |
+| 벤치 | [DexBench](https://dexbench.org/en/) — 산업 dexterity 태스크 표준화 (§7) |
 | 보고서 | arXiv:2605.03269 (v2), 저자 68명 |
 
 ## 2. 내 LIBERO 하네스 실측 — OpenVLA 동일조건 A/B + 400ep 재현
@@ -181,7 +181,19 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 <img src="_static/rldx_strip_gr1_2.png" alt="GR-1 tabletop filmstrip 2/2" style="width:100%;border-radius:8px;margin-top:8px" />
 </details>
 
-## 4. 재현 실록 — 환경·프로토콜에서 확인한 것
+## 4. VLM probe — robot-VQA 적응이 무엇을 바꾸나 (Qwen3-VL vs RLDX-1-VLM)
+
+기술보고서 Table 2b는 "순정 Qwen3-VL(57.5%) vs robot-VQA 적응 RLDX-1-VLM(60.9%)"을 **action 학습까지 끝낸 downstream 성공률**로 보여준다 — 1×4090으로 재현 불가(from-scratch 60K step). 대신 **두 VLM이 모두 공개**라는 점을 이용해, 같은 로봇 프레임(내 실측 롤아웃에서 추출)에 그들 VQA 데이터의 3축과 같은 질문 — ① 공간관계 ② 다음 subtask ③ 저수준 motion ④ 인스턴스 grounding — 을 던져 **답이 어떻게 달라졌는지**를 직접 본다.
+
+<img src="_static/rldx_vlm_probe.png" alt="Qwen3-VL vs RLDX-1-VLM robot VQA probe" style="width:100%;border-radius:8px" />
+
+**관찰 (12문항, 정직하게 승패 혼재):**
+- **RLDX-1-VLM의 적응 흔적이 뚜렷하다**: 공간 답에 **거리 수치**가 붙고("~25cm", "5–10cm"), subtask 답이 **저수준 imperative**("move the gripper towards the black bowl")로 나온다 — 그들 VQA 구축 3축(EE↔물체 공간관계 / 중간 subtask / 저수준 action 정렬)의 스타일 그대로. 색 grounding에서 순정이 틀린 것을 맞췄다(**red ✓ vs brown ✗**).
+- **순정 Qwen3-VL이 나은 지점도 있다**: subtask를 task 수준으로 요약("Move the black bowl to the plate"), GR-1 장면에서 canonical 명칭("drawer")을 답한 반면 RLDX-VLM은 시각적 서술("blue box")로 답했다. motion 질문에 이유 설명도 더 풍부하다.
+- **해석**: robot-VQA 적응은 "만능 향상"이 아니라 **action 디코더가 소비하기 좋은 형태로 표현을 돌려놓는 것** — 거리 수치화, imperative 단답, EE 중심 서술. Table 2b의 +3.4%p는 이 스타일 전환의 downstream 얼굴로 읽는 게 정확하다.
+- 프로토콜: greedy decoding, max 60 tokens, 동일 프롬프트·프레임. 원본 답변 전체는 `robotics-lab/outputs/vlm_probe/vlm_probe.json`.
+
+## 5. 재현 실록 — 환경·프로토콜에서 확인한 것
 
 - **공개 상태는 진짜다**: 코드·가중치·문서(architecture/training/evaluation.md)까지 전부 실재. `RLDXPolicy` 5줄로 로드된다.
 - **flash-attn 벽**: 표준 설치 경로가 CUDA toolkit(nvcc) 전제의 소스 빌드. nvcc 없는 WSL에서는 커뮤니티 프리빌트 휠(`2.7.4.post1+cu126torch2.7`)로 우회해야 했다.
@@ -189,7 +201,7 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 - **평가 프로토콜 차이 발견**: 그들의 LIBERO 래퍼는 에피소드마다 **랜덤 초기 배치**로 리셋한다(공식 LIBERO/OpenVLA 프로토콜은 벤치마크 고정 init state). A/B 공정성을 위해 고정-init 옵션을 패치로 추가했다(기본 동작 불변, `RLDX_FIXED_INIT=1`, `robotics-lab/wsl/rldx_fixed_init_patch.py`).
 - **torchcodec ↔ FFmpeg 8 비호환**(§4에서 만남): torchcodec 0.4는 Ubuntu 26.04의 libavutil 60을 못 연다 — RLDX 로더가 1급 지원하는 opencv 백엔드로 대체.
 
-## 5. Human 시연 → RLDX-1 학습데이터 (LeRobot v2.1)
+## 6. Human 시연 → RLDX-1 학습데이터 (LeRobot v2.1)
 
 [Human Pose 트랙](human_pose.md) §10–11이 "사람 손을 로봇 손으로"였다면, 이 절은 그 시연을 **RLDX-1이 먹는 포맷**으로 직렬화한다. RLDX-1 기술보고서는 "사람 손 리타게팅으로 시간당 200+ 시연 수집"을 데이터 엔진의 축으로 쓰고, 학습 입력은 **LeRobot v2.1**이다 — 정확히 이 파이프라인의 산업 버전.
 
@@ -254,7 +266,7 @@ LOADER_OK — RLDX-1 mid-training input schema satisfied.
 
 **정직 캐비엇**: ① 12개 시뮬 시연 = 데이터 엔진의 **미니어처 증명**이지 스케일이 아니다(그들은 시간당 200+). ② 실 egocentric 손궤적([HOT3D, human_pose §11.4–11.7](human_pose.md))의 동일 직렬화는 다음 단계 — 여기서는 시뮬 실행이 검증된 시연만 담았다. ③ 스케일업 레퍼런스: RLDX-1은 video 생성모델 증폭(합성 5×)으로 GR-1 벤치 +9.2%p를 보고 — 우리 확장 D(실비디오)와 같은 방향. ④ RLDX-1 가중치는 비상업 라이선스이며 본 데이터셋은 학습·연구 시연용.
 
-## 6. DexBench — 산업 dexterity 태스크 분류 (18태스크 × 55케이스)
+## 7. DexBench — 산업 dexterity 태스크 분류 (18태스크 × 55케이스)
 
 RLWRLD가 NVIDIA와 공동으로 발표한 산업 dexterity 벤치 표준(Isaac Lab-Arena 통합 예정). 현재는 **태스크 정의/분류 체계**이며(코드·데이터셋 공개 아님) 산업 현장 관찰(assembly·sorting·packaging)에서 도출됐다. 분류 2축:
 
@@ -288,7 +300,7 @@ RLWRLD가 NVIDIA와 공동으로 발표한 산업 dexterity 벤치 표준(Isaac 
 
 **내 실습 연결**: Contact Precision 축은 [human_pose](human_pose.md) HM5의 force-closure(ε)·침투 페널티가 쓰는 언어 그대로다. T17의 동적 추적은 [world models 트랙](wm.md)의 존재 이유(모션 예측)와 닿고, T12/T13은 내 bin-pick 파이프라인(zg/GSN/HGGD) 경험과 겹친다. breakdown-curve 철학("어디서 붕괴하는가를 재라")은 이 사이트의 정직 규칙과 같은 정신이다.
 
-## 7. 재현 커맨드 + 산출물 맵
+## 8. 재현 커맨드 + 산출물 맵
 
 ```bash
 # 환경 (WSL2, uv): flash-attn은 프리빌트 휠로 주입 (nvcc 불필요)
@@ -297,7 +309,7 @@ uv venv --python 3.10
 uv pip install "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.0.8/flash_attn-2.7.4.post1+cu126torch2.7-cp310-cp310-linux_x86_64.whl"
 uv pip install -e . && uv pip install -e ".[eval]"
 
-# LIBERO env 클라이언트 (셋업 스크립트 4중 수리 — §4)
+# LIBERO env 클라이언트 (셋업 스크립트 4중 수리 — §5)
 CMAKE_POLICY_VERSION_MINIMUM=3.5 bash rldx/eval/sim/LIBERO/setup_libero.sh
 uv pip install --python rldx/eval/sim/LIBERO/libero_uv/.venv/bin/python \
     transformers==4.57.0 diffusers accelerate mujoco==2.3.2 robosuite==1.4.1
@@ -307,7 +319,7 @@ python3 robotics-lab/wsl/rldx_fixed_init_patch.py ~/rldx/RLDX-1
 N_EP=2  bash robotics-lab/wsl/rldx_libero_ab.sh RLWRLD/RLDX-1-FT-LIBERO ab_n2    # OpenVLA 동일조건
 N_EP=10 bash robotics-lab/wsl/rldx_libero_ab.sh RLWRLD/RLDX-1-FT-LIBERO ab_n10   # 400ep 재현
 
-# human demo → LeRobot v2.1 + RLDX 로더 검증 (§5)
+# human demo → LeRobot v2.1 + RLDX 로더 검증 (§6)
 uv run --no-sync python robotics-lab/src/vla_lerobot_export.py
 python robotics-lab/src/vla_lerobot_quality.py
 ```
