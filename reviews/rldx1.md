@@ -104,36 +104,9 @@ action과 물리 신호를 **동시에 디노이즈** — 접촉 동역학을 �
 
 실기 3플랫폼: OpenArm(범용성 6태스크 전승, Object Grounding 87.5 vs GR00T 33.3=랜덤), **ALLEX 4태스크 평균 86.8 vs 39.1/44.8**(motion/memory/physics 각각이 해당 모듈의 ablation 실증 구도), FR3 6태스크 평균 68.5 vs 34.4/31.6.
 
-## 내 실습 연결 — 내 하네스에서 직접 실행 (실측)
+## 내 실습 연결
 
-FT-LIBERO 체크포인트를 **내 WSL2 + RTX 4090 + 기존 LIBERO 하네스**(OpenVLA 평가에 쓴 그 체크아웃, 같은 bddl/init-state 파일)에서 실측했다. 프로토콜은 내 OpenVLA 런과 동일: **공식 고정 init state(에피소드 k → init_states[k]) + 10-step settle, 태스크당 2 트라이얼(suite당 20ep), suite별 step 예산 220/280/300/520**. RLDX는 서버-클라이언트(zmq)로 띄우고 action chunk 16 중 8-step 실행. 입력은 각 모델의 네이티브 규약(RLDX: front+wrist 2뷰+state / OpenVLA: 3인칭 1뷰) — 기술보고서의 baseline 비교와 같은 방식이다.
-
-### 동일 조건 A/B + 확장 재현 런 (2026-08-11)
-
-| Suite | OpenVLA-7B-FT (내 실측) | **RLDX-1 (내 실측, 20ep)** | **RLDX-1 (내 실측, 100ep)** | 보고서 주장 (500ep) |
-|---|---|---|---|---|
-| Spatial | 80% | 95% | **100.0%** | 98.0 |
-| Object | 85% | 100% | **99.0%** | 99.3 |
-| Goal | 85% | 90% | **93.0%** | 98.4 |
-| Long (libero_10) | 45% | 95% | **96.0%** | 95.3 |
-| **평균** | 73.75% | 95.0% | **97.0%** (388/400) | 97.8 |
-
-(20ep 런 = OpenVLA와 완전 동일 프로토콜의 A/B, 100ep 런 = 같은 고정-init 하네스로 표본만 5배 키운 재현 런.)
-
-읽는 법:
-- **주장이 내 셋업에서 재현된다**: 400ep 표본에서 **97.0 vs 주장 97.8** — Spatial/Object/Long은 오차 안에서 일치(100.0/99.0/96.0 vs 98.0/99.3/95.3). 유일하게 Goal(93.0 vs 98.4)이 5%p 낮은데, 실패가 특정 태스크에 몰려 있어(top-drawer+bowl, cream-cheese-in-bowl 등 4개) 프로토콜 차이(고정 init vs 랜덤 리셋, step 예산 300 vs 720)가 원인 후보다.
-- **격차의 위치가 논문 서사와 일치**: 짧은 suite에서 OpenVLA 대비 +10~15%p, **Long에서 +50%p** — "long-horizon으로 갈수록 벌어진다"(RC365 결과의 축소판)를 내 하네스에서 재확인.
-- **실패 4건은 전부 부분 실패(1/2)**: spatial `black_bowl_on_the_stove`(내 OpenVLA도 stove 계열에서 실패 — 겹치는 실패 모드), goal `top_drawer+bowl`·`cream_cheese_in_bowl`, long `mug_in_microwave_and_close`.
-- 결과 원본: `robotics-lab/outputs/rldx_ab_n2.json`(태스크별), 롤아웃 영상 80개 저장.
-
-### 재현 과정에서 확인한 것 (정직 기록)
-
-### 재현 과정에서 확인한 것
-
-- 공개 상태는 진짜다: 코드·가중치·문서(architecture/training/evaluation.md)까지 전부 실재. `RLDXPolicy` 5줄로 로드된다.
-- **flash-attn 벽**: 표준 설치 경로가 CUDA toolkit(nvcc) 전제의 소스 빌드. nvcc 없는 WSL에서는 커뮤니티 프리빌트 휠(`2.7.4.post1+cu126torch2.7`)로 우회해야 했다.
-- **`setup_libero.sh`는 그대로는 안 돈다**: ① cmake 4.x가 구식 egl-probe를 거부(`CMAKE_POLICY_VERSION_MINIMUM=3.5` 필요) ② 스크립트가 고정한 transformers 4.51.3에는 `masking_utils`가 없어 자기 자신(rldx 패키지)을 import 못 한다(→4.57.0으로 상향) ③ diffusers/accelerate가 클라이언트 venv에 누락 ④ 무핀 mujoco가 3.11로 풀려 robosuite 1.4의 `MjData.qM` 접근이 깨진다(→내 검증 조합 mujoco 2.3.2로 고정). — 대기업 공개 레포도 환경 재현은 이만큼 깨지기 쉽다는 표본.
-- **평가 프로토콜 차이 발견**: 그들의 LIBERO 래퍼는 에피소드마다 **랜덤 초기 배치**로 리셋한다(공식 LIBERO/OpenVLA 프로토콜은 벤치마크 고정 init state). A/B 공정성을 위해 고정-init 옵션을 패치로 추가했다(기본 동작 불변, `RLDX_FIXED_INIT=1`).
+**내 4090 + 내 LIBERO 하네스에서 직접 실측했다** — OpenVLA 동일조건 A/B(20ep/suite)에서 **95.0 vs 73.75%**(Long +50%p), 고정-init 하네스 400ep 재현에서 **97.0 vs 주장 97.8**. 프로토콜(고정 init state 정렬 패치), suite·태스크별 수치, 재현 실록(flash-attn/setup_libero 4중 수리/프로토콜 차이 발견), 그리고 내 human 시연을 LeRobot v2.1로 직렬화해 **RLDX 자체 로더로 검증(LOADER_OK)** 한 데이터 파이프라인까지 — 실전 전체는 전용 페이지 **[RLDX-1 실전](../rldx.md)** 에 정리했다.
 
 ## 한 줄 평 / 한계
 
