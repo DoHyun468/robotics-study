@@ -25,6 +25,7 @@
 **retargeting & 시연 수집**
 - [H2O (2024)](h2o.md) — SMPL 피팅 → 휴머노이드 **retargeting** → RL 추적 정책 → **RGB 캠 하나로 실시간 전신 텔레옵**.
 - [UMI (2024)](umi.md) — 핸드헬드 그리퍼로 **로봇 없이 시연 수집** → diffusion policy. 시연 데이터 파이프라인의 실용 최전선.
+- [DexCap (2024)](dexcap.md) — UMI가 못 가는 **다지손** 영역: SLAM+EMF 장갑 모캡 리그($4k)로 가림에 강하게 캡처 → fingertip IK로 LEAP 핸드 retarget → point-cloud diffusion policy.
 
 **상호작용 & 에고센트릭**
 - [GRAB (2020)](grab.md) — 전신 인간의 **물체 파지·조작** MoCap(SMPL-X + 접촉). hand-object interaction의 데이터 기준.
@@ -39,9 +40,10 @@
 | [SMPL·MANO](smpl-mano.md) | 2015·2017 | **캡처의 공통 언어** — 저차원 파라미터로 몸·손을 표현 | SMPL 6890버텍스·24관절, MANO 778버텍스·PCA 6/10/15개=81/90/95% |
 | [H2O](h2o.md) | 2024 | **retargeting + 실시간 텔레옵** | AMASS 13k 시퀀스 → retarget 10k → feasibility 필터 ~8.5k, HybrIK 30Hz·H1 19-DoF |
 | [UMI](umi.md) | 2024 | **시연 수집 장치 + 정책** (retargeting을 장치 설계로 회피) | 그리퍼 BoM $73, SLAM 오차 6.1mm/3.5°, in-the-wild 71.7% |
+| [DexCap](dexcap.md) | 2024 | **다지손 시연 수집** (추적을 센서로 강화 + fingertip IK) | 리그 $4k·1.8kg, 텔레옵 3배 속도, 기본 3태스크 평균 72% |
 
 ## 이 갈래를 읽는 축
 
-- **사람 동작을 쓰는 두 전략**: H2O는 사람 몸 → 로봇 몸으로 **명시적 retargeting**(kinematics 대응·최적화)을 하고, UMI는 애초에 **로봇과 같은 end-effector를 사람 손에 들려서** retargeting 문제 자체를 장치로 소거한다. 전자는 휴머노이드·전신, 후자는 매니퓰레이션에 각각 유리.
+- **사람 동작을 쓰는 세 전략**: H2O는 사람 몸 → 로봇 몸으로 **명시적 retargeting**(kinematics 대응·최적화)을 하고, UMI는 애초에 **로봇과 같은 end-effector를 사람 손에 들려서** retargeting 문제 자체를 장치로 소거한다. DexCap은 그 중간 — 소거가 불가능한 **다지손**에서 추적을 센서 물리(EMF+SLAM)로 강화하고 retargeting을 fingertip IK 한 층으로 얇게 만든다. 전신은 H2O, 그리퍼 조작은 UMI, 다지손은 DexCap이 각각의 답.
 - **캘리브레이션·기하가 전 구간의 바닥**이다: 멀티카메라 pose 추정은 카메라 간 시공간 캘리브레이션 위에서만 성립하고, UMI의 SLAM 오차(6.1mm)는 곧 시연 데이터의 라벨 노이즈가 된다 — 이 사이트 [perception 파이프라인](../perception.md)에서 실측한 "캘리브 오차의 하류 전파"와 정확히 같은 구조.
 - [VLA](vla.md)와의 관계: VLA는 (관측, 행동) 시연을 소비한다. 이 갈래는 그 시연을 **사람에게서 값싸게 만드는** 쪽이다 — OpenVLA가 쓴 Open X-Embodiment(로봇 텔레옵 수집)의 병목을 우회하는 다음 세대 공급망.

@@ -389,6 +389,8 @@ RLWRLD가 NVIDIA와 공동으로 발표한 산업 dexterity 벤치 표준(Isaac 
 
 **내 실습 연결**: Contact Precision 축은 [human_pose](human_pose.md) HM5의 force-closure(ε)·침투 페널티가 쓰는 언어 그대로다. T17의 동적 추적은 [world models 트랙](wm.md)의 존재 이유(모션 예측)와 닿고, T12/T13은 내 bin-pick 파이프라인(zg/GSN/HGGD) 경험과 겹친다. breakdown-curve 철학("어디서 붕괴하는가를 재라")은 이 사이트의 정직 규칙과 같은 정신이다.
 
+**짝지어 읽을 리뷰**: 이런 태스크의 **데이터 공급**(다지손 시연을 로봇 없이 모으기)은 [DexCap 리뷰](reviews/dexcap.md), `C_force`·Contact Precision 축의 **센서-표현 계열**(촉각을 3D 점으로 시각과 융합)은 [3D-ViTac 리뷰](reviews/3d-vitac.md) — 각각 RLDX 데이터 엔진(teleop)과 physical sensing 스트림의 학계 대응물이다.
+
 ## 8. 재현 커맨드 + 산출물 맵
 
 ```bash

@@ -74,6 +74,7 @@ parts:
           - file: reviews/zerograsp
           - file: reviews/contact-graspnet
           - file: reviews/dexgraspnet
+          - file: reviews/3d-vitac
       - file: reviews/vla
         sections:
           - file: reviews/openvla
@@ -90,6 +91,7 @@ parts:
           - file: reviews/hamer
           - file: reviews/h2o
           - file: reviews/umi
+          - file: reviews/dexcap
           - file: reviews/grab
           - file: reviews/hot3d
       - file: world-models/latent

@@ -1,11 +1,12 @@
 # Grasp Detection
 
-로봇이 물체를 **어디를 어떻게 잡을지** 예측하는 grasp 검출 모델 리뷰. 우리 [bin picking A/B](../grasp_sota.md)에 직접 통합해 top-down heuristic과 비교한 모델들이다.
+로봇이 물체를 **어디를 어떻게 잡을지** 예측하는 grasp 검출 모델 리뷰. 우리 [bin picking A/B](../grasp_sota.md)에 직접 통합해 top-down heuristic과 비교한 모델들 + 검출(접촉 전)이 끝나는 지점에서 시작하는 **접촉 후** 촉각 조작 리뷰 1편.
 
 - [GraspNet-1B (2020)](graspnet.md) — 6-DoF grasp 검출의 기준선(PointNet++ → ApproachNet/OperationNet/ToleranceNet). Windows/WSL에서 CUDA 컴파일·통합.
 - [ZeroGrasp (2025)](zerograsp.md) — object-centric reconstruction 기반 SOTA. open-tray A/B에서 학습 grasp 1위(단 GT mask 사용).
 - [Contact-GraspNet (2021)](contact-graspnet.md) — 접촉점을 **관측 표면 점에 고정**해 6-DoF grasp을 저차원화. 우리 [§11.9–11.10 접촉 앵커링](../human_pose.md)과 같은 발상의 평행-그리퍼 학습판.
 - [DexGraspNet (2023)](dexgraspnet.md) — **미분가능 force-closure 에너지**로 다지 grasp 대량 합성(132만 grasp). 우리 [§11.10–11.12 grasp 합성](../human_pose.md)의 대규모 정공법 버전.
+- [3D-ViTac (2024)](3d-vitac.md) — **접촉 후(post-contact)의 축**: $20 촉각 패드(16×16 taxel)를 FK로 3D 점으로 바꿔 시각과 한 좌표계에서 diffusion policy 학습. 검출이 좋아져도 남는 "집었는데 미끄러짐/과압" 실패 계열의 답 (문헌 리뷰, A/B 미통합).
 
 ## 우리 실측 비교 (6물체 · 5 seed · 평균 clearance)
 
