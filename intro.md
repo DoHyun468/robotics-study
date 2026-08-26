@@ -21,6 +21,12 @@
 물성 4축 7+태스크. stack 95% · push 5/5 · pour ✗(정직한 실패) · rope 자유단 16mm.
 :::
 
+:::{grid-item-card} ROBOTIS 실측
+:link: robotis
+:link-type: doc
+AI Worker에 guidance 이식 **20/20**(중력 처짐 FK 보정) · MANO→HX5-D20 리타게팅 잔차 Allegro의 **1/2.7**.
+:::
+
 :::{grid-item-card} Grasp SOTA A/B
 :link: grasp_sota
 :link-type: doc
