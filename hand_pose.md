@@ -13,6 +13,33 @@
 3. 복원: $(\beta,\text{pose})$ 를 0에서 시작해 **멀티뷰 reprojection 오차**를 Adam으로 최소화(약한 shape prior 포함).
 4. GT 대비 복원 손의 **관절 오차(mm)** · 버텍스 오차 · reprojection(px) · $\beta$ 오차를 5-seed 평균으로 측정.
 
+:::{dropdown} 해부 — 피팅 한 사이클: 입력→최적화→출력 (`src/mano_fit.py` 발췌)
+**분류가 중요하다**: 이건 학습(learned regression)이 아니라 **인스턴스별 gradient 최적화**다 — 사전학습 가중치가 없고, MANO forward가 미분가능하다는 점만 이용해 매 손마다 처음부터 푼다. **입력**: 뷰별 캘리브 `(K 3×3, R 3×3, t 3)` × N + 2D 관측 `(21,2)` px × N. **출력**: `β (10,)` + global orient `(3,)` + pose PCA `(n,)` → forward하면 3D 관절 `(21,3)` [m].
+
+```python
+def project(P3, K, R, t):                       # 관절체 버전의 핀홀 투영 (미분가능)
+    Pc = P3 @ Rt.T + tt                         # world → camera
+    uvw = Pc @ Kt.T
+    return uvw[:, :2] / uvw[:, 2:3].clamp(min=1e-6)   # 동차 나눗셈 → (N,2) px
+
+# 최적화 대상 3개를 0에서 시작 (GT를 훔쳐볼 수 없음)
+betas = torch.zeros(1, 10, requires_grad=True)
+go    = torch.zeros(1, 3, requires_grad=True)          # global orient
+pose  = torch.zeros(1, n_pca, requires_grad=True)      # PCA 계수 = 자유도 손잡이
+opt = torch.optim.Adam([betas, go, pose], lr=0.05)
+for it in range(iters):
+    J, _ = joints_of(model, betas, go, pose)           # MANO forward → 3D 관절
+    loss = 0.0
+    for (K, R, t), uv_obs in zip(cams, obs):           # 모든 뷰의 재투영오차 합
+        uv = project(shift(J), K, R, t)
+        loss = loss + ((uv - uv_obs) ** 2).sum(-1).mean()
+    loss = loss / len(cams) + 1e-3 * (betas ** 2).mean()   # 약한 shape prior
+    loss.backward(); opt.step()
+```
+
+E4–E8은 전부 이 루프의 **관측 또는 목적함수만 바꾼 변주**다: E4 = 관측에 표면 대응점 200개 추가, E5 = 피팅에 쓰는 `(K,R,t)`만 섭동(관측은 참 카메라), E7 = `uv_obs` 일부를 무작위 마스킹, E8 = 프레임 간 `‖poseₜ−poseₜ₋₁‖²` 항 추가. 실험 축이 코드에서 한 줄씩이라는 것 자체가 이 방법론(GT 알고 복원 재기)의 힘이다.
+:::
+
 <video src="_static/mano_fit.mp4" controls loop muted playsinline style="width:100%;max-width:520px;border-radius:8px"></video>
 
 *cam 1 시점에서 최적화가 수렴하는 과정 — 초기(0에서 시작)에서 GT(teal 원)로 복원값(주황 ×)이 붙는다.*
@@ -123,6 +150,27 @@ E1에서 "키포인트로는 shape가 안 잡힌다"를 봤다. 이걸 대조 �
 *① MANO 손 파지에서 개폐폭·각도를 읽음 → ② 그리퍼 명령으로 변환 → ③ 로봇 팔이 그 파지로 박스를 집음.*
 
 MANO 파지에서 **개폐폭**(thumb–index span)과 **grasp yaw**(opening 축)를 뽑아 평행 그리퍼 명령으로 매핑하고, 실제로 박스를 집어 든다.
+
+:::{dropdown} 해부 — 손 자세에서 그리퍼 명령 3개를 뽑는 매핑 (`src/mano_retarget.py` · `mano_retarget_panda.py` 발췌)
+**입력**: MANO 3D 관절 `(21,3)`. **출력**: 스칼라 3개 — aperture [m] · yaw [rad] · 그리퍼 프레임 `R`. 전부 룰베이스 기하:
+
+```python
+thumb, index, wrist = J[THU_TIP], J[IDX_TIP], J[0]
+aperture = np.linalg.norm(thumb - index)      # ① 개폐폭 = 엄지팁–검지팁 거리
+center = 0.5 * (thumb + index)
+y = (index - thumb) / ‖·‖                     # ② opening 축 (손가락이 벌어진 방향)
+a = (center - wrist) / ‖·‖                    # ③ approach 축 (손목 → pinch)
+z = a - (a @ y) * y                           #    직교화 → 그리퍼 z
+R = np.stack([np.cross(y, z), y, z], axis=1)  #    cols = [x, y(open), z(approach)]
+
+# panda 실행 쪽 (mano_retarget_panda.py): 스칼라 2개가 파이프라인에 꽂히는 지점
+yaw = atan2(y[1], y[0])                       # opening 축을 테이블 평면에 투영
+box_w = min(0.068, max(0.030, ap * 0.55))     # 손이 쥐었을 물체 크기 추정 (72mm 게이트)
+Rg = bp.topdown_R(yaw)  →  dls_ik  →  sim     # 이후는 manipulation 공통 파이프라인 그대로
+```
+
+"매핑은 쉽다"의 실체가 이 몇 줄이다 — 21관절 손 자세가 결국 스칼라 2개(yaw·aperture)로 압축되고, 어려움은 전부 그 뒤의 접촉 물리 실행(0/12 vs 10/10)에 있었다.
+:::
 
 **매핑은 쉽다 — 물리 실행이 어렵다.** 두 가지 실행을 비교했다:
 

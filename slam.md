@@ -88,6 +88,31 @@
 
 두 프론트엔드를 **독립 구현**해 비교한다: ① **point-to-plane ICP** scan-to-scan(선형화 6-DoF 최소자승, 법선 추정) ② **ORB + RGB-D PnP**(RANSAC). 각각 GT pose[0]에서 상대 모션을 적분해 궤적을 만들고, **정지(무모션) baseline**과 함께 GT와 대조한다.
 
+:::{dropdown} 해부 — VO 한 스텝의 I/O와 두 프론트엔드 핵심 (`src/slam_vo.py` 발췌)
+둘 다 룰베이스(기하+최소자승·RANSAC — ORB도 hand-crafted 특징)다. **공통 계약**: 인접 프레임 쌍 → 상대변환 `M (4,4)` = cam_{i+1} 좌표 → cam_i 좌표. 궤적은 `T_est[i+1] = T_est[i] @ M`으로 적분(그래서 M의 오차가 그대로 drift로 누적된다).
+
+```python
+# ① ICP point-to-plane: 반복마다 6-DoF 증분을 '선형' 최소자승으로
+s = (T[:3,:3] @ src.T).T + T[:3,3]           # 현재 추정으로 src 변환
+dist, idx = tree.query(s)                    # 최근접 대응 (KD-tree), 8cm 게이트
+ps, qs, ns = s[m], tgt[idx[m]], tgt_n[idx[m]]
+# min Σ(((R p + t) − q)·n)²,  R ≈ I + [w]× 소각 선형화 → 6×6 정규방정식
+G = np.hstack([np.cross(ps, ns), ns])        # (M,6): [p×n | n]
+r = np.sum((ps - qs) * ns, axis=1)           # point-to-plane 잔차
+x = np.linalg.solve(G.T @ G, -G.T @ r)       # [w(3), t(3)] 증분
+T = exp(x) @ T                               # 수렴까지 25회 (유도 → slam_math §2)
+
+# ② ORB + RGB-D PnP: 3D는 프레임 i의 depth에서, 2D는 프레임 i+1에서
+pts3d = backproject(kp0[m.queryIdx], depth_i)     # i의 특징점을 depth로 3D화
+pts2d = kp1[m.trainIdx].pt                        # i+1에서 매칭된 2D
+ok, rvec, tvec, inl = cv2.solvePnPRansac(pts3d, pts2d, K, None,
+                                         reprojectionError=2.0)
+M = np.linalg.inv(T_from(rvec, tvec))             # PnP는 i→i+1이라 역변환
+```
+
+같은 계약(M) 위에서 대응 방식만 다르다 — dense 기하(전 픽셀) vs sparse 특징(수백 점). 이 구조 차이가 결과의 "궤적 길이에 따라 순위가 바뀐다"는 관찰로 이어진다.
+:::
+
 <img src="_static/slam_vo_traj.png" alt="VO trajectory vs GT (top-down)" style="width:100%;max-width:820px;border-radius:8px">
 
 | 방법 | ATE | RPE Δ1 | RPE Δ10 |
@@ -102,6 +127,24 @@
 
 같은 RGB-D를 **pose 소스만 바꿔가며**(GT / ICP / PnP) open3d TSDF로 융합해 하나의 컬러 3D 복원을 만든다. 궤적이 정확할수록 지도가 선명하고, drift가 크면 지도가 뒤틀리고 번진다.
 
+:::{dropdown} 해부 — TSDF 융합과 지도 지표의 I/O (`src/slam_map.py` 발췌)
+**입력**: 프레임별 (RGB, depth, K) + pose 소스 `T_wc (N,4,4)` — 이 pose가 유일한 실험 변수다. **출력**: mesh + point cloud. 융합은 룰(가중 이동평균, 유도 → [slam_math §5](slam_math.md)):
+
+```python
+vol = o3d.pipelines.integration.ScalableTSDFVolume(
+    voxel_length=0.008, sdf_trunc=4 * 0.008, color_type=RGB8)   # 8mm 복셀
+for i in range(len(depths)):
+    vol.integrate(rgbd_i, intr, np.linalg.inv(T_wc[i]))   # open3d는 world→cam을 받음
+mesh = vol.extract_triangle_mesh()
+
+# 지도 지표: 대칭 Chamfer (est↔GT-pose 지도), 정렬 없이 raw로 — drift 영향을 그대로 노출
+acc  = est_pcd.compute_point_cloud_distance(gt_pcd)    # est→gt: 없어야 할 곳의 표면
+comp = gt_pcd.compute_point_cloud_distance(est_pcd)    # gt→est: 못 덮은 GT 표면
+```
+
+본문의 "바닥 제외" 정정이 이 지표 코드에 걸려 있다 — 평평한 바닥은 yaw drift에 불변이라 포함하면 지표가 왜곡을 가린다.
+:::
+
 <img src="_static/slam_map_compare.png" alt="TSDF reconstruction GT vs estimated poses" style="width:100%;max-width:820px;border-radius:8px">
 
 지도 품질은 GT-pose 지도 대비 **대칭 Chamfer 거리**(테이블탑 씬, 바닥 제외)로 잰다: **ICP 11.3 mm < ORB+PnP 14.3 mm** — S1 ATE 순위와 일치(궤적 정확 → 지도 정확). *방법 메모: 처음엔 바닥을 포함했더니 지표가 눈에 보이는 왜곡과 어긋났다. 평평한 바닥은 수직축 yaw 회전에 거의 불변이라 회전 drift를 가리기 때문 — 씬(테이블·물체)만 크롭해 정정했다. 단일 지표를 시각과 대조 없이 믿지 않는다.*
@@ -109,6 +152,28 @@
 ### S3 — Pose-graph SLAM 백엔드 (loop closure로 drift 보정)
 
 S1의 ORB+PnP 오도메트리를 프론트엔드로 받아, **loop closure**(2번째 바퀴가 1번째 바퀴를 재방문하는 프레임쌍을 ORB+PnP로 매칭)를 검출하고 전체 pose graph를 **SE(3) 매니폴드에서 Gauss-Newton으로 최적화**한다. ORB-SLAM3 빌드 대신 `exp/log`·adjoint·희소 GN solver를 직접 구현했다(리군 기하·최소자승 상태추정).
+
+:::{dropdown} 해부 — loop 검출 룰과 GN 한 반복 (`src/slam_posegraph.py` 발췌)
+**입력**: VO 궤적 `(N,4,4)` + odometry 엣지 + loop 엣지(각 엣지 = 상대변환 관측 `Z`). **출력**: 최적화된 궤적 `(N,4,4)`. 전부 룰베이스 — loop "인식"조차 학습 place recognition이 아니라 기하 룰이다:
+
+```python
+# loop 검출 룰: 시간상 멀고(|i−j|≥20) 공간상 가까운(VO 위치 <15cm) 쌍만 후보로,
+# 프레임당 최근접 max_cand=3개만 ORB+PnP로 검증 → O(n·k)로 bound (fr1_xyz 폭증 대응)
+cand = [i for i in range(j - min_gap + 1) if ‖pos[i] − pos[j]‖ < d_thresh]
+
+# GN 한 반복: BetweenFactor 잔차와 자코비언 (유도 → slam_math §6)
+for (i, j, Z, w) in edges:                     # odom w=1, loop w=3
+    A = inv(Z) @ inv(T[i]) @ T[j]
+    e = se3_log(A)                             # 잔차 = Log(Z⁻¹ Tᵢ⁻¹ Tⱼ) ∈ ℝ⁶
+    Ji = -adjoint(inv(T[j]) @ T[i])            # ∂e/∂ξᵢ (우섭동, 소오차 근사 Jᵣ⁻¹≈I)
+    Jj = np.eye(6)                             # ∂e/∂ξⱼ
+    H[블록] += w * Jᵀ @ J;  b[블록] += w * Jᵀ @ e    # 희소 6×6 블록 조립
+dx = np.linalg.solve(H + λI, -b)               # pose 0은 앵커(고정) — 게이지 자유도 제거
+T[k] = T[k] @ se3_exp(dx[k])                   # 매니폴드 위 업데이트
+```
+
+"loop closure가 drift를 접는다"의 실체: loop 엣지 하나가 H에 멀리 떨어진 두 pose를 잇는 off-diagonal 블록을 만들고, solve가 그 제약을 **전 구간에 분배**한다 — 그래서 다중 loop가 분포해야 효과라는 본문 관찰이 나온다.
+:::
 
 <img src="_static/slam_posegraph.png" alt="pose-graph SLAM before/after vs GT" style="width:100%;max-width:820px;border-radius:8px">
 <img src="_static/slam_pg_ate.png" alt="ATE before/after loop closure" style="width:100%;max-width:520px;border-radius:8px">
@@ -127,6 +192,28 @@ held-out 뷰에서 테이블·12개 물체·그림자가 인식 가능하게 복
 ### S4b — 3D Gaussian Splatting 업그레이드 (SOTA 표현)
 
 NeRF를 **진짜 3D Gaussian Splatting**으로 업그레이드했다. gaussian을 RGB-D back-projection(180k)으로 초기화하고 gsplat의 미분가능 CUDA rasterizer로 최적화한다(CUDA 12.1 toolkit + gcc-12 host compiler 셋업). 동일 프로토콜로 NeRF와 직접 비교.
+
+:::{dropdown} 해부 — gaussian의 파라미터와 최적화 스텝 (`src/slam_3dgs.py` 발췌)
+NeRF/3DGS는 "학습"이라기보다 **장면별(per-scene) 최적화**다 — 사전학습 가중치가 없고, 이 씬의 프레임에만 맞춘다. **입력**: RGB `(T,H,W,3)` + depth + pose `(T,4,4)` + K. **최적화 변수**: gaussian당 5종 — `means (N,3)` 위치, `quats (N,4)` 회전, `log_scales (N,3)`, opacity, 색.
+
+```python
+# 초기화: depth 역투영이 곧 초기 gaussian — 3DGS가 RGB-D에서 빨리 수렴하는 이유
+x = (us - cx) / fx * z;  y = (vs - cy) / fy * z
+pts_world = (T_wc @ [x, y, z, 1])[:3]          # 180k 점 + 픽셀 색 그대로
+
+means = torch.tensor(pts, requires_grad=True)   # 파라미터별 다른 lr (위치는 lr×0.1)
+opt = torch.optim.Adam([{means, lr·0.1}, {log_scales, lr·0.5},
+                        {quats, lr·0.1}, {opacity, lr}, {colors, lr}])
+for it in range(iters):                         # 프레임 하나씩 무작위로
+    render, alpha, _ = rasterization(           # gsplat 미분가능 CUDA rasterizer
+        means, normalize(quats), exp(log_scales), sigmoid(raw_opac),
+        sigmoid(colors_raw), viewmat[i], K, W, H, render_mode="RGB")
+    loss = (pred - gt).abs().mean() + 0.5 * ((pred - gt) ** 2).mean()   # L1 + L2
+    loss.backward(); opt.step()                 # (공분산 RSSᵀRᵀ·EWA 유도 → slam_math §8)
+```
+
+pose는 이 최적화의 **고정 입력**이다 — 그래서 GT pose vs S3 pose 두 버전을 학습해 비교하면 "pose 오차가 맵 품질에 주는 영향"이 분리 측정된다(본문 5.1dB 격차의 실험 설계).
+:::
 
 <img src="_static/slam_3dgs_render.png" alt="3DGS novel-view synthesis vs GT" style="width:100%;max-width:820px;border-radius:8px">
 
@@ -157,6 +244,25 @@ NeRF를 **진짜 3D Gaussian Splatting**으로 업그레이드했다. gaussian�
 ### S6 — SplaTAM식 tracking: 3DGS 맵에 카메라 localization
 
 S4b 3DGS는 mapping까지였다. 뉴럴 SLAM의 나머지 절반 **tracking**을 더한다: **고정된 3DGS 맵에 대해 perturb된 초기 pose에서 렌더링 photometric error를 gradient로 최소화해 카메라 pose를 복원**한다(SplaTAM tracking).
+
+:::{dropdown} 해부 — tracking의 최적화 변수는 단 6개 (`src/slam_track.py` 발췌)
+**입력**: 얼린 3DGS 맵(전 gaussian `detach()`) + 관측 이미지 1장 + perturb된 초기 pose. **출력**: 보정된 pose `(4,4)`. mapping과 대칭 구조다 — mapping은 pose 고정·gaussian 최적화, tracking은 **gaussian 고정·pose 6-DoF만 최적화**:
+
+```python
+gmeans = g["means"].detach(); ...               # 맵 전체 동결 (gradient 차단)
+rot   = torch.zeros(3, requires_grad=True)      # 최적화 변수 = axis-angle 3 + 평행이동 3
+trans = torch.zeros(3, requires_grad=True)
+opt = torch.optim.Adam([rot, trans], lr=8e-3)
+for it in range(180):
+    R = axis_angle_to_matrix(rot)               # gaussian means를 강체변환해 렌더
+    pred = render_frozen(gmeans, ..., viewmat_init, K, W, H, R, trans)
+    loss = (pred - obs).abs().mean()            # photometric L1 — 이게 전부다
+    loss.backward(); opt.step()                 # gsplat rasterizer를 통해 pose로 역전파
+T_est = inv(inv(T_init) @ M(rot, trans))        # 보정 변환을 초기 pose에 합성
+```
+
+"맵을 pose로 미분한다"가 미분가능 rasterizer의 값이다 — 대응점 탐색(ICP)도 특징 매칭(PnP)도 없이, 렌더-비교-역전파만으로 (4°, 40mm) → (0.03°, 1.1mm). means 강체변환 ≡ 카메라 역변환의 동치성은 [slam_math §9](slam_math.md) 참조.
+:::
 
 <img src="_static/slam_track.png" alt="3DGS camera tracking before/after + render alignment" style="width:100%;max-width:820px;border-radius:8px">
 

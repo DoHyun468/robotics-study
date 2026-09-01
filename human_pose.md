@@ -95,6 +95,29 @@ $\pi_c$ = 카메라 $c$ 의 핀홀 투영, $\rho$ = pseudo-Huber(이상치 완�
 
 > **파이프라인 한눈에:** ① N개 캘리브 카메라가 몸을 관측 → ② 각 뷰에서 2D 관절 검출(여기선 GT 투영+노이즈로 대체) → ③ SMPL $(\beta,\theta,\mathbf t)$ 를 **모든 뷰의 재투영오차 최소화**로 최적화(§1의 forward가 미분가능하므로 gradient descent) → ④ 3D 몸(관절·메시) 복원.
 
+:::{dropdown} 해부 — §2 수식이 코드로는 몇 줄인가 (`src/hm_smpl_fit.py` 발췌)
+학습이 아니라 **인스턴스별 최적화**다(사전학습 가중치 없음 — §11.3의 HMR2.0과 정확히 이 지점이 다르다). **입력**: 뷰별 `(K,R,t)` + 2D 관측 `(22,2)` px × N뷰. **출력**: `β (10,)` · global orient `(3,)` · body pose `(21,3)` axis-angle · `transl (3,)`.
+
+```python
+# 최적화 변수 4개 — §2 수식의 (β, θ, t)를 그대로 텐서로
+betas  = torch.zeros(10, requires_grad=True)
+go     = torch.zeros(3, requires_grad=True)            # 전역 회전
+body   = torch.zeros(BODY_J - 1, 3, requires_grad=True)  # 관절 21 × axis-angle
+transl = torch.tensor([0., 0., 0.], requires_grad=True)
+opt = torch.optim.Adam([betas, go, body, transl], lr=0.05)
+for it in range(iters):
+    pose = torch.cat([go[None], body, zeros(손·얼굴)], 0)   # 손은 flat 고정 (HM0 범위)
+    Jp, _ = smpl.forward(betas, pose, transl)               # §1의 자체구현 forward
+    loss = 0.02 * (betas ** 2).mean() + 0.001 * (body ** 2).mean()   # λ_β, λ_θ prior
+    for (K, R, t), uv in zip(cams, obs):
+        d = project(K, R, t, Jp[:BODY_J]) - uv
+        loss = loss + torch.sqrt((d ** 2).sum(-1) + 1.0).mean()      # ρ = pseudo-Huber
+    loss.backward(); opt.step()
+```
+
+§2 수식과 1:1 대응이다: $\rho$ = `sqrt(d²+1)` 줄, $\lambda_\beta\|\beta\|^2$ = `0.02·betas²`, $\pi_c$ = `project`. HM1은 여기에 손 30관절 + `log_scale` 파라미터 하나를 추가한 것이고, HM2는 loss에 침투 항(`Σ max(0,−sd)²` — **sum이어야 한다**, mean으로 걸면 gradient가 묽어져 §0의 그 버그)을 더한 것이다.
+:::
+
 <img src="_static/hm_smpl_fit.png" alt="SMPL multi-view body fitting result" style="width:100%;max-width:1000px;border-radius:8px">
 
 *결과: 좌=GT 관절(teal)과 복원(주황 ×)·뼈대가 3D에서 겹침, 중=cam-1 재투영(회색=복원 메시), 우=shape $\beta$ GT vs 복원.*
@@ -300,6 +323,27 @@ $$\min_{\theta,\,s,\,t}\ \sum_{j=1}^{16}\Big\|\,s\,m\,P_{xy}\big(\hat J_j(\theta
 
 $P_{xy}$ = 관절의 $(x,y)$ 성분(직교투영), $m{=}{\pm}1$ 좌우손 반전, $x^{\text{det}}_j$ = MediaPipe 검출 2D. 2단계(카메라+전역회전 먼저 → 관절 자세 추가) Adam.
 
+:::{dropdown} 해부 — 실사진 피팅의 어댑터와 2단계 스케줄 (`src/hm6_realfit.py` 발췌)
+여기서 학습 모델은 **검출(MediaPipe)뿐**이고 피팅은 위와 같은 인스턴스별 최적화다. 어댑터의 실체는 ① 대응표 ② 초기화 ③ 단계 분리 세 가지:
+
+```python
+target = lm[MP_IDX]                      # ① MediaPipe 21점 → 우리 MANO 16관절 대응표로 선별
+chir = -1.0 if handedness == "Left" else 1.0   #    왼손은 x-미러로 오른손 MANO에 피팅
+
+# ② 초기화가 관건 — 스케일을 검출 bbox 크기에서 역산해 시작 (0에서 시작하면 발산)
+span = max(target[:, 0].ptp(), target[:, 1].ptp())
+log_s = log(max(span, 20.0) / 0.16)      #    손 실측폭 ~16cm 가정 → 약투영 스케일 초깃값
+
+# ③ 2단계: Phase 1 = 카메라+전역회전만 (pose 동결) → 거친 정렬
+opt = torch.optim.Adam([go, log_s, t], lr=0.05)     # 250 iter
+# Phase 2 = + 관절 자세(PCA), 가볍게 정규화
+opt = torch.optim.Adam([go, hp, log_s, t], lr=0.02) # 700 iter
+loss = sqrt(((pred - tgt) ** 2).sum(1) + 1e-6).mean() + 0.03 * (hp ** 2).mean()
+```
+
+단계를 안 나누면 pose가 카메라 몫의 오차까지 흡수해 뒤틀린 손이 나온다 — SMPLify 계열이 전부 staged optimization을 쓰는 이유를 실사진에서 그대로 재현한 구조.
+:::
+
 <img src="_static/hm6_realfit.png" alt="real photos -> MediaPipe 2D -> our MANO fit" style="width:100%;max-width:1200px;border-radius:8px">
 
 *위=실제 사진 + MediaPipe 검출(green) vs 우리 MANO 재투영(orange ×). 아래=복원된 3D MANO를 **40° 회전**해 본 것 — pointing은 검지, victory는 두 손가락이 실제로 3D에서 펴져 복원됨(단안 사진 1장에서).*
@@ -377,6 +421,32 @@ HM6.1–6.3은 단안이라 **3D GT가 없어 정성**이었다. 여기서는 **
 $$\min_{\theta,\,s,\,\mathbf t}\ \sum_{j}\Big\|\,\pi_{f}\big(s\,\hat J_j(\theta)+\mathbf t\big)-x^{\text{GT2D}}_j\,\Big\|,\qquad \pi_f(P)=\Big(f\tfrac{P_x}{P_z}+c_x,\ f\tfrac{P_y}{P_z}+c_y\Big)$$
 
 복원한 3D 관절 $s\hat J(\theta)+\mathbf t$ 를 GT 3D와 두 방식으로 비교한다: **root-relative MPJPE**(손목 정렬 — 광선방향 깊이 모호 포함)와 **PA-MPJPE**(Procrustes 상사 정렬로 전역 회전·스케일·깊이를 제거 → 손 *형상/관절* 자체 정확도). 왼손은 x-미러 후 오른손 MANO로 피팅.
+
+:::{dropdown} 해부 — 실 GT 벤치의 정확한 I/O와 지표 계산 (`src/hot3d_fit.py` 발췌)
+**입력**(dump 산출물): 프레임별 GT 2D `uv (20,2)` px + GT 3D `lm_cam (20,3)` m(카메라 프레임) + 실제 Aria 캘리브 `fx, ppx, ppy`. **출력**: 복원 3D `(15,3)` + 지표 3개(reproj px · root-rel mm · PA mm).
+
+```python
+# 대응표: HOT3D 20랜드마크 ↔ 우리 MANO 16관절 (fingertip 5개는 우리 모델에 없어 제외 → 15점)
+OUR_IDX   = [0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 7, 8, 9, 14, 15]
+HOT3D_IDX = [5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 6, 7]
+
+if left:                                        # 왼손 → 오른손 MANO로 미러
+    tgt2d[:, 0] = 2 * ppx - tgt2d[:, 0]; gt3d[:, 0] *= -1.0
+
+# 완전 원근 피팅 (§11.1의 약투영과 달리 실제 초점거리 fx 사용 — metric 깊이 t_z 추정)
+t = torch.tensor([0.0, 0.0, 0.35], requires_grad=True)   # 손은 헤드캠에서 ~35cm 초기화
+π_f(P) = (fx·Px/Pz + ppx,  fx·Py/Pz + ppy)               # full-perspective
+
+# 지표: 같은 복원 Pc를 두 정렬로 재서 '깊이 모호'와 '형상 정확도'를 분리
+rr = ‖(Pc − Pc[wrist]) − (gt3d − gt3d[wrist])‖.mean()     # root-relative — 깊이 모호 포함
+def procrustes(A, B):                                     # 상사 정렬 (회전+스케일+평행이동)
+    U, S, Vt = svd((A−Ā).T @ (B−B̄)); R = Vt.T @ U.T      #   반사 방지 det 체크 포함
+    return s · (A−Ā) @ R.T + B̄
+pa = ‖procrustes(Pc, gt3d) − gt3d‖.mean()                 # PA — 형상/관절만
+```
+
+"PA 3.9mm vs root-rel 48.9mm"의 차이는 이 두 지표 코드의 차이 그 자체다 — 같은 복원을 정렬만 달리 재서, 오차를 "단안이 원리적으로 못 잡는 몫(깊이)"과 "피팅이 실제로 맞춘 몫(형상)"으로 분해한다.
+:::
 
 #### 결과 — 실제 3D GT 대비
 
