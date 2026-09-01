@@ -27,6 +27,82 @@ Windows에서는 돌릴 수 없는(MinkowskiEngine·octree 계열 CUDA 확장을
 
 인지 파이프라인 자체(마커 없는 물체별 point cloud 역투영·centroid/yaw 추정)는 이 사이트의 [perception](perception.md) 챕터와 같은 marker-less RGB-D 방식이다 — 여기서 바뀌는 것은 grasp *검출* 알고리즘뿐, 인지·씬·실행 루프는 고정했다.
 
+## 인퍼런스 해부 — 학습 모델이 실제로 받는 것과 뱉는 것
+
+전체 사이클은 **룰(우리) → 학습(모델) → 룰(우리)**의 샌드위치다. 학습이 관여하는 건 가운데 "cloud → grasp 후보" 한 단계뿐이고, 앞뒤(인지 전처리·feasibility 필터·IK·실행)는 heuristic 베이스라인과 완전히 같은 룰베이스 코드다 — 이게 apples-to-apples의 실체다.
+
+```text
+depth H×W [m]                                                    [기하, 룰]
+ └→ pinhole 역투영 → workspace crop → 20k 포인트 샘플 (camera frame)
+     └→ 학습 모델 forward: cloud (1,20000,3) → grasp 후보 ~N×17     [학습 ★]
+         └→ camera→world 변환 → feasibility 필터 4종                [기하, 룰]
+             └→ 동일 dls_ik → 동일 sim() 실행 → 물리 판정            [공통, 룰]
+```
+
+**함수 명세** (GraspNet 드라이버 `src/bin_pick_gn.py` 기준 — WSL 드라이버 5종도 같은 인터페이스):
+
+| 단계 | 종류 | 입력 | 출력 |
+|---|---|---|---|
+| `scene_grasps(net, …)` 전처리 | 기하 (룰) | depth `720×1280` float [m] | workspace cloud `(20000, 3)` float32, camera frame |
+| `net({'point_clouds': …})` + `pred_decode` | **학습 (PointNet++)** | cloud `(1, 20000, 3)` GPU 텐서 | grasp 배열 `N×17`: `[score, width, height, depth, R(9), t(3), obj_id]` |
+| world 변환 + 필터 | 기하 (룰) | grasp N개 (camera frame) | 실행 가능한 grasp 1개 (world frame) 또는 없음 |
+| `dls_ik` → `sim` | 공통 (룰) | TCP 목표 위치·회전 | [manipulation](manipulation.md) 공통 해부와 동일 |
+
+:::{dropdown} 코드 ① 모델 앞뒤 — cloud 만들기와 6-DoF 디코드 (`src/bin_pick_gn.py` 발췌)
+```python
+# 전처리 (룰): depth → cloud → workspace crop → 고정 seed 20k 샘플
+pc_cam = np.stack([(u - cx) / fx * d, (v - cy) / fy * d, d], 1)   # 역투영 (camera frame)
+pc_world = (R_wc @ pc_cam.T).T + cam
+ws = (bin 내부 XY) & (TABLE < z < 0.45)            # 테이블·벽 제거 — 모델엔 물체+bin 바닥만
+cloud = pc_cam[ws][idx].astype(np.float32)          # (20000, 3) — 모델은 camera frame을 받는다
+
+# 인퍼런스 (학습): 이 한 줄만 신경망이다
+gg = pred_decode(net({'point_clouds': torch.from_numpy(cloud)[None].cuda()}))[0]
+# gg: (N, 17) = [score, width, height, depth, R 3×3(9), t(3), obj_id] — 후보 수백 개
+
+# 후처리 (룰): grasp를 world로, 회전 규약을 우리 그리퍼 규약으로
+Rc = row[4:13].reshape(3, 3); tc = row[13:16]
+point = R_wc @ tc + cam;  R = R_wc @ Rc            # camera → world
+z_g = R[:, 0]                                       # GraspNet 규약: 1열 = approach 방향
+x_g = R[:, 1] - (R[:, 1] @ z_g) * z_g               # 2열 = closing → 직교화해 손가락 방향으로
+R_goal = np.column_stack([x_g, np.cross(z_g, x_g), z_g])   # 우리 그리퍼: z=approach, x=closing
+```
+
+회전 **규약 변환**(모델의 열 순서 ↔ 우리 그리퍼의 축 정의)이 통합의 실질적 절반이다 — 여기가 틀리면 모델이 옳아도 전부 미스가 난다.
+:::
+
+:::{dropdown} 코드 ② feasibility 필터 — 후보 수백 개에서 실행 1개로 (`src/bin_pick_gn.py` 발췌)
+모델은 물리·로봇을 모르므로, 후보를 score 내림차순으로 돌며 **4가지 룰**로 거른다. 첫 통과가 실행된다:
+
+```python
+for g in grasps:                                   # score 내림차순
+    if g["width"] > 0.075:            continue     # ① 그리퍼 개도(75mm) 초과
+    R_goal, z_g = grasp_to_Rgoal(g)
+    if z_g[2] > (-0.2 if do_open else -0.6):       # ② 접근 방향: walled bin은 near-vertical 강제
+        continue                                   #    (open tray는 tilt 허용 — 3번 발견의 코드 실체)
+    if grasp point가 tray 밖:         continue     # ③ 작업영역 안
+    near = [b for b in remaining if ‖xpos[b] − g["point"]‖ < 4.5cm]
+    if not near:                      continue     #    실제 물체 근처인지 (허공 grasp 제거)
+    tcp = g["point"] + z_g * g["depth"]            # grasp depth만큼 접근 방향으로 전진
+    q_appr, e1 = bp.dls_ik(…, tcp − z_g*0.12, …)   # ④ IK 도달 가능 (잔차 2cm 룰 — 공통)
+    q_grasp, e2 = bp.dls_ik(…, tcp, …)
+    if max(e1, e2) > 0.02:            continue
+    chosen = …; break
+```
+
+②의 상수 하나(`−0.6` vs `−0.2`)가 walled/open 결과 차이의 코드 원인이다: walled에서는 기울어진 후보가 전부 여기서 잘려 6-DoF 강점이 소거된다.
+:::
+
+**모델별 입력 차이** (같은 씬 렌더에서 각 모델의 네이티브 입력만 다르게 준다):
+
+| 모델 | 모델이 받는 입력 | 비고 |
+|---|---|---|
+| GraspNet-1B · graspness · EconomicGrasp · Contact-GraspNet | 씬 point cloud `(20000, 3)` (depth만) | mask 불필요 |
+| ZeroGrasp | RGB-D + **per-object GT instance mask** | 구조상 필수 입력 — 공정성 캐비엇 참조 |
+| HGGD | RGB `(1,3,1280,720)` + depth 2D 텐서 | 2D heatmap 모델. config의 realsense K를 **우리 카메라 K로 교체 주입**(`get_camera_intrinsic` 몽키패치) 후 역투영 |
+
+출력은 전부 같은 스키마(6-DoF grasp 후보 + score)로 정규화해 위의 동일 필터·실행에 태운다.
+
 ## 결과 (6물체 · 5 seed, 평균 clearance rate)
 
 | method | 발표 | modality | walled | open |

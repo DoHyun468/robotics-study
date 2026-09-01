@@ -22,6 +22,58 @@ RLWRLD(리얼월드)의 공개 로봇 파운데이션 모델 **RLDX-1**을 보�
 
 `RLDX-1-FT-LIBERO` 체크포인트를 **내 WSL2 + RTX 4090 + 기존 LIBERO 하네스**(OpenVLA 평가에 쓴 그 체크아웃, 같은 bddl/init-state 파일)에서 실측했다. 프로토콜은 내 OpenVLA 런과 동일: **공식 고정 init state(에피소드 k → init_states[k]) + 10-step settle, suite별 step 예산 220/280/300/520**. RLDX는 서버-클라이언트(zmq)로 띄우고 action chunk 16 중 8-step 실행. 입력은 각 모델의 네이티브 규약(RLDX: front+wrist 2뷰+state / OpenVLA: 3인칭 1뷰) — 기술보고서의 baseline 비교와 같은 방식이다.
 
+### 인퍼런스 해부 — 서버-클라이언트에서 액션 청크까지
+
+[OpenVLA](vla.md)가 "스텝마다 토큰 7개 = 액션 1개"라면, RLDX-1·π0.5는 **청크 생성형**이다: 한 번의 forward가 미래 액션 여러 개를 한꺼번에 디노이즈하고, 그중 앞부분만 실행한 뒤 재질의한다(receding horizon). 학습이 관여하는 곳은 디노이징 forward 하나이고, 관측 패키징·청크 실행 룰·성공 판정은 전부 룰베이스 코드다.
+
+```text
+LIBERO obs (원시)
+ └→ 래퍼: 관측 패키징 — 2뷰 이미지 + EE state + 태스크 문장            [룰]
+     └→ zmq로 서버 전송 (모델 8.1B는 서버 GPU에 상주)
+         └→ MSAT 디노이징: (2뷰, state, 문장) → action chunk (16, 7)   [학습 ★]
+             └→ 클라이언트: 앞 8 스텝만 env.step 실행 → 재질의          [룰]
+                 └→ 성공 판정 = LIBERO BDDL 술어 (우리 코드 아님)        [룰]
+```
+
+**관측/액션 스키마** (그들 LIBERO 래퍼 코드에서 그대로 — 이 키 이름들이 §6 SIMPLER 수리의 단서이기도 했다):
+
+| 키 | shape / 의미 |
+|---|---|
+| `video.image` · `video.wrist_image` | `(256, 256, 3)` uint8 × 2뷰 (agentview·손목, 상하좌우 flip) |
+| `state.x/y/z` · `state.roll/pitch/yaw` | EE 위치 3 + 회전 3 (`quat2axisangle`로 변환) |
+| `state.gripper` | `(2,)` 그리퍼 관절 |
+| `annotation.human.action.task_description` | 태스크 문장 (언어 조건) |
+| `action.x…yaw` + `action.gripper` | 출력 7-DoF — chunk `(16, 7)`로 생성, 정규화 해제는 체크포인트 동봉 `statistics.json`의 per-key 통계로 |
+
+:::{dropdown} 코드 — 관측 패키징과 청크 실행 룰 (RLDX-1 저장소 `eval/sim/LIBERO` 래퍼 · `rollout_policy.py` 발췌)
+```python
+# 래퍼: LIBERO 원시 obs → RLDX 관측 스키마 (룰베이스 변환)
+xyz = obs["robot0_eef_pos"]; rpy = quat2axisangle(obs["robot0_eef_quat"])
+new_obs = {
+    "video.image":       obs["agentview_image"][::-1, ::-1],        # 180° flip
+    "video.wrist_image": obs["robot0_eye_in_hand_image"][::-1, ::-1],
+    "state.x": [xyz[0]], "state.y": [xyz[1]], "state.z": [xyz[2]],
+    "state.roll": [rpy[0]], "state.pitch": [rpy[1]], "state.yaw": [rpy[2]],
+    "state.gripper": obs["robot0_gripper_qpos"],
+    "annotation.human.action.task_description": task_description,
+}
+
+# 클라이언트 루프: 서버에 관측 → 청크 수신 → 앞 n_action_steps만 실행
+n_action_steps: int = 8            # 생성 chunk 16 중 8만 실행 (receding horizon)
+actions, _ = policy.get_action(observations)   # zmq 왕복 — 서버에서 MSAT 디노이징
+next_obs, rewards, terms, truncs, infos = env.step(actions)
+
+# 우리 하네스 정렬 패치 (RLDX_FIXED_INIT=1): 랜덤 리셋 대신 공식 고정 init
+observation = self._env.set_init_state(self._init_states[k])
+for _ in range(10):                # settle — 공식 OpenVLA LIBERO 프로토콜과 동일
+    observation, _, _, _ = self._env.step([0.0] * 6 + [-1.0])
+```
+
+서버-클라이언트로 쪼갠 이유는 의존성 격리다: 모델 쪽(torch 2.7 + flash-attn)과 시뮬 쪽(mujoco 2.3.2 + robosuite 1.4)이 같은 venv에서 공존 불가능하다 — §7의 환경 실록이 그 증거.
+:::
+
+π0.5는 서버 없이 lerobot 로컬 로드로 같은 프로토콜을 돈다(`wsl/pi05_libero_eval.py`): `preprocess_observation(raw)` → `obs["task"] = [문장]` → `policy.select_action(obs)` — lerobot 자체 eval 경로를 1:1로 따르되 매 leaf에 배치 차원(B=1)을 붙이는 것까지가 우리가 짠 어댑터다(§7 통합 실록 ④). 내부는 역시 flow-matching 청크 생성이라 구조는 RLDX와 같은 축이고, 뒤의 §3(GR-1)·§5(RoboCasa)·§6(SIMPLER)도 **같은 서버-클라이언트 뼈대에서 embodiment(관측 뷰 수·state 구성·액션 차원)만 바뀐다** — §6에서 그 "state 구성"이 문서가 아니라 체크포인트 `statistics.json`에만 적혀 있었다는 게 수리 3번의 정체다.
+
 | Suite | OpenVLA-7B-FT | **RLDX-1 (20ep)** | **π0.5 (20ep)** | RLDX-1 (100ep) | RLDX 주장 | π0.5 주장 |
 |---|---|---|---|---|---|---|
 | Spatial | 80% | 95% | 90% | **100.0%** | 98.0 | — |

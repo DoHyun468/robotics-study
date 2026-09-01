@@ -10,6 +10,63 @@
 - **출력**: next-token 예측으로 뽑는 **7-DoF delta EE action**(+ gripper) — 연속 action을 discrete token으로 매핑해 BC(behavior cloning)로 학습
 - 재현에는 LIBERO 4-suite에 **LoRA**(r=32)로 파인튜닝된 공식 체크포인트를 그대로 사용(`openvla/openvla-7b-finetuned-libero-spatial`, ~14GB 자동 다운로드)
 
+## 인퍼런스 해부 — 이미지+문장이 action 7개 숫자가 되기까지
+
+L1/L2와 달리 여기는 **전 구간이 학습 모델**이고, 룰베이스가 남는 자리는 앞뒤의 얇은 어댑터(이미지 전처리, 토큰→실수 역변환, gripper 부호 변환)뿐이다. 한 제어 스텝의 데이터 흐름:
+
+```text
+LIBERO obs: agentview RGB 256² + 태스크 문장
+ └→ 전처리: center-crop → 비전 인코더 입력 해상도로 리사이즈            [룰]
+     └→ 프롬프트: "In: What action should the robot take to {문장}?\nOut:"
+         └→ VLA forward: 이미지 패치 토큰 + 텍스트 토큰 → next-token 7개  [학습 ★]
+             └→ 토큰 id → 256-bin 인덱스 → bin 중심값 (정규화 action)     [룰, 결정적]
+                 └→ q01/q99 통계로 비정규화 → 7-DoF delta action          [룰]
+                     └→ env.step(action) → 다음 obs                       [시뮬]
+```
+
+**함수 명세**: `predict_action(input_ids, unnorm_key) → np.ndarray (7,)` = `[Δx, Δy, Δz, Δroll, Δpitch, Δyaw, gripper]` (EE delta [m/rad] + gripper 스칼라). autoregressive지만 `do_sample=False`(greedy)라 같은 입력이면 같은 출력이다.
+
+:::{dropdown} 코드 ① 프롬프트 → 액션 토큰 → 실수 복원 (OpenVLA 공식 `modeling_prismatic.py` · `openvla_utils.py` 발췌)
+```python
+# 프롬프트 구성 + 멀티모달 전처리 (openvla_utils.py)
+prompt = f"In: What action should the robot take to {task_label.lower()}?\nOut:"
+inputs = processor(prompt, image).to(DEVICE, dtype=torch.bfloat16)
+action = vla.predict_action(**inputs, unnorm_key=unnorm_key, do_sample=False)
+
+# predict_action 내부 (modeling_prismatic.py) — 토큰이 실수가 되는 전 과정
+generated_ids = self.generate(input_ids, max_new_tokens=7)        # ① LM이 토큰 7개 생성
+predicted_action_token_ids = generated_ids[0, -7:]                 #    (action 차원 수만큼)
+discretized_actions = self.vocab_size - predicted_action_token_ids # ② 어휘 끝 256개 = action 전용
+discretized_actions = np.clip(discretized_actions - 1, 0, 255)     #    토큰 id → bin 인덱스
+normalized_actions = self.bin_centers[discretized_actions]         # ③ bin 중심값 → [-1,1] 정규화 action
+
+stats = self.get_action_stats(unnorm_key)                          # ④ 학습 데이터셋의 per-dim 통계
+action_high, action_low = np.array(stats["q99"]), np.array(stats["q01"])
+actions = np.where(mask,                                           # ⑤ 비정규화 (gripper는 mask로 제외)
+    0.5 * (normalized_actions + 1) * (action_high - action_low) + action_low,
+    normalized_actions)
+```
+
+핵심 설계가 ②–③에 있다: 연속 action을 **Llama 어휘의 마지막 256 토큰**에 균등 bin으로 매핑해, "로봇 제어"를 문자 그대로 next-token 예측으로 환원한다. ④의 `unnorm_key`가 학습 데이터셋(여기선 `libero_spatial`)의 q01/q99를 고르는데 — 우리 파인튜닝 실험에서 0% 원인 후보로 제일 먼저 점검한 것이 바로 이 통계다(정상이었고, 결론은 undertrain).
+:::
+
+:::{dropdown} 코드 ② 평가 루프 — 에피소드 하나의 뼈대 (`run_libero_eval.py` 구조)
+```python
+env.reset(); obs = env.set_init_state(init_states[episode_idx])   # 공식 고정 init state
+for t in range(max_steps):                # suite별 예산 (spatial 220 … long 520)
+    img = get_libero_image(obs)           # agentview 렌더 → (필요시 center-crop)
+    action = get_action(cfg, model, observation, task_description)  # 위 ①
+    action = normalize_gripper_action(action, binarize=True)  # [0,1]→[-1,+1] (env 규약)
+    obs, reward, done, info = env.step(action.tolist())
+    if done: break                        # 성공 판정은 env(BDDL 술어)가 내림
+success = done                            # 시도 후 리셋, suite당 10태스크 × n trial
+```
+
+성공 판정도 우리가 짠 룰이 아니라 LIBERO의 BDDL goal 술어다 — 모델·판정 모두 그들 네이티브 규약이라는 것이 "재현"의 조건.
+:::
+
+**학습 시에는 무엇이 흐르나** (파인튜닝 절의 배경): `finetune.py`의 LoRA 학습도 같은 구조를 거꾸로 쓴다 — RLDS 에피소드의 (이미지, 문장, action)에서 action을 위 ②③의 역방향으로 **토큰화해 정답 시퀀스에 붙이고, action 토큰 자리에만 next-token cross-entropy**를 건다. 그래서 train 지표가 "token accuracy"(연속 오차가 아니라 bin 적중률)인 것이고, 아래 "train 지표 ≠ task 성공" 반전의 복선이기도 하다.
+
 ## LIBERO 벤치마크 & 평가 프로토콜
 
 LIBERO는 로봇 조작 언어-조건부 정책의 표준 벤치로, **spatial / object / goal / long(10)** 4개 suite로 난이도·조합축을 나눈다. 태스크는 전부 "pick up the black bowl {between the plate and the ramekin / on the cookie box / in the top drawer / ...} and place it on the plate" 류 — **언어로 지정된 물체를 집어 목표 위치에 놓기**다.

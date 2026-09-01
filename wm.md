@@ -26,6 +26,24 @@ SLAM S0 시퀀스(정지 테이블탑을 카메라가 2바퀴 궤도로 도는 2
 - **GT action**: 인접 프레임 카메라 상대 pose의 se(3) log = 6-DoF 카메라 트위스트 $a_t=\log(T_{c_t}^{-1}T_{c_{t+1}})^\vee$. MuJoCo가 GT pose를 주므로 **정확한 행동 신호**를 공짜로 얻는다 → action-conditioned world model이 가능. 등속 궤도라 $\lVert a_t\rVert\approx0.075$로 거의 일정.
 - **메트릭**: 표현 예측은 latent-MSE, 픽셀 예측은 PSNR/SSIM, 그리고 **horizon별 오차 곡선**(몇 스텝 앞까지 버티나).
 
+:::{dropdown} 해부 — 하네스의 I/O와 GT action 계산 (`src/wm_data.py` 발췌)
+모든 자체구현 스테이지가 같은 배치를 받는다: `WindowDataset[i] → (ctx (k,3,64,64), fut (h,3,64,64), act (k+h−1,6))` — 이미지는 [0,1] float32, action은 6-vector 트위스트 [v(3), w(3)]. action은 학습이 아니라 **SE(3) 로그맵의 폐형해**(룰베이스)다:
+
+```python
+def se3_log(T):                       # 4×4 상대 pose → 6-vector twist
+    R, t = T[:3, :3], T[:3, 3]
+    w = so3_log(R)                    # SO(3) log: 회전행렬 → axis-angle (Rodrigues 역)
+    K = skew(w / theta)
+    Vinv = np.eye(3) - 0.5 * (theta * K) + (1 - cot(theta/2)·(theta/2)) * (K @ K)
+    v = Vinv @ t                      # left-Jacobian 역행렬로 병진 성분 복원
+    return np.concatenate([v, w])     # a_t = log(T_wc(t)⁻¹ · T_wc(t+1))∨
+
+# 프레임 t의 action = "다음 카메라의 모션을 현재 카메라 프레임에서 표현한 트위스트"
+```
+
+MuJoCo가 GT pose를 주기 때문에 이 action엔 추정 오차가 없다 — "action-conditioned 예측이 되는가"를 다른 오염 없이 물을 수 있는 조건.
+:::
+
 <img src="_static/wm_frames.png" alt="MuJoCo orbit sequence RGB + depth samples" style="width:100%;max-width:900px;border-radius:8px">
 
 이 장면은 world model 벤치로 좋은 성질이 있다: **정적 장면 + 알려진 ego-motion**이라 "카메라 행동을 받아 장면이 어떻게 재투영되는지"라는 순수 3D/기하 예측 문제로 환원된다(독립적으로 움직이는 물체가 없음). 뒤에서 보듯 이건 world model에 **유리한 체제**이며, 결과는 그 전제 위에서 읽어야 한다.
@@ -33,6 +51,29 @@ SLAM S0 시퀀스(정지 테이블탑을 카메라가 2바퀴 궤도로 도는 2
 ## 3. W1 — 예측·표현형 (JEPA 자체구현)
 
 V-JEPA식으로, **픽셀을 복원하지 않고 표현(latent)만 예측**한다. online 인코더 $f_\theta$, 그 EMA인 target 인코더 $f_\xi$(stop-grad), 그리고 action을 받아 잠재를 굴리는 residual 예측기 $z_{t+1}=z_t+g_\phi([z_t,a_t])$. 손실은 예측 잠재와 target 잠재의 정규화 MSE(BYOL식) + collapse 방지를 위한 VICReg 분산 힌지. (유도 → [수식 챕터 §1](wm_math.md).)
+
+:::{dropdown} 해부 — W1의 세 모듈과 학습 스텝 (`src/wm_jepa.py` 발췌)
+**I/O**: `Encoder: (B,3,64,64) → (B,256)` · `Predictor.step: (z (B,256), a (B,6)) → z' (B,256)` · 손실은 스칼라 2개(pred_mse + var)뿐. 픽셀 복원 항이 없다는 게 이 계열의 정의다.
+
+```python
+class Predictor(nn.Module):
+    """Residual action-conditioned latent dynamics: z_{t+1} = z_t + g([z_t, a_t])."""
+    def step(self, z, a):
+        return z + self.net(torch.cat([z, a], dim=-1))   # 잔차 구조 — 항등에서 출발
+
+# 학습 스텝: online이 예측, EMA target이 정답 (stop-grad)
+z0 = online(ctx[:, -1])                          # 마지막 컨텍스트 프레임 인코딩
+zpred = pred.rollout(z0, fut_acts)               # action으로 h스텝 굴림 (B,h,256)
+with torch.no_grad():
+    zt = target(fut_frames)                      # 실제 미래 프레임의 EMA 표현
+pred_mse = ((F.normalize(zpred) - F.normalize(zt)) ** 2).sum(-1).mean()   # BYOL식
+var = torch.mean(F.relu(1.0 - torch.sqrt(z0.var(dim=0) + 1e-4)))          # VICReg 분산 힌지
+loss = pred_mse + var
+ema_update(online, target, m=0.996)              # target ← 0.996·target + 0.004·online
+```
+
+probe는 학습 후 인코더를 얼리고 `ridge_probe_cv`(PCA-16 + ridge, 5-fold held-out)로 latent → 카메라 위치/평균 depth 회귀 — **probe 쪽은 학습이 아니라 선형회귀(룰)**라, "표현이 기하를 담는가"를 표현 자체의 성질로 물을 수 있다.
+:::
 
 <img src="_static/wm_jepa.png" alt="JEPA training, horizon latent prediction, probe R2" style="width:100%;max-width:1000px;border-radius:8px">
 
@@ -48,6 +89,34 @@ PlaNet의 잠재 동역학(RSSM)을 그대로 구현: 결정론 GRU 히스토리
 
 **평가 = 상상(imagination)**: 앞 $k$프레임을 관측해 posterior 상태를 세운 뒤, **미래는 관측 없이 prior만** GT action으로 굴려 프레임을 디코드하고 GT와 대조한다.
 
+:::{dropdown} 해부 — RSSM 셀과 상상 rollout (`src/wm_rssm.py` 발췌)
+**I/O**: `img_step(s (B,32), a (B,6), h (B,200)) → h', prior(μ,σ)` (상상용) · `obs_step(…, emb (B,256)) → h', prior, posterior` (관측 있을 때). 디코더는 `[h, s] (B,232) → 프레임 (B,3,64,64)`.
+
+```python
+def img_step(self, s, a, h):                     # prior 전이 — 관측 없이 굴리는 쪽
+    h = self.rnn(self.fc_in(torch.cat([s, a], -1)), h)     # GRU가 히스토리 유지
+    mu, std = self._dist(self.prior(h))
+    return h, mu, std
+
+def obs_step(self, s, a, h, emb):                # 관측이 있으면 posterior로 보정
+    h, pmu, pstd = self.img_step(s, a, h)
+    qmu, qstd = self._dist(self.post(torch.cat([h, emb], -1)))
+    return h, (pmu, pstd), (qmu, qstd)
+
+# 학습: ELBO = 복원 + KL(q‖p), free bits로 KL 바닥 1 nat
+kl_loss += torch.clamp(kl(qmu, qstd, pmu, pstd), min=free_nats).mean()
+
+# 평가 = 상상: k프레임 posterior burn-in → 이후는 prior만 (관측 차단)
+for t in range(k):                               # burn-in: 관측으로 상태 수립
+    h, _, (qmu, qstd) = rssm.obs_step(s, a_prev, h, emb[t:t+1]); s = qmu
+for t in range(k, k + h):                        # imagination: prior만 + GT action
+    h, pmu, pstd = rssm.img_step(s, a_prev, h); s = pmu
+    preds.append(dec(torch.cat([h, s], -1)))     # 잠재 → 픽셀 디코드 → GT와 PSNR
+```
+
+"상상"의 코드 정의가 이 두 루프의 차이다: `obs_step`(관측 사용) → `img_step`(관측 차단). baseline("직전 프레임 반복")과의 10–18dB 격차는 전부 두 번째 루프가 만든 것.
+:::
+
 <img src="_static/wm_rssm_rollout.png" alt="RSSM imagination rollout vs GT" style="width:100%;max-width:1000px;border-radius:8px">
 <img src="_static/wm_rssm.png" alt="RSSM training curves and horizon PSNR" style="width:100%;max-width:1000px;border-radius:8px">
 
@@ -61,6 +130,31 @@ PlaNet의 잠재 동역학(RSSM)을 그대로 구현: 결정론 GRU 히스토리
 
 두 방식으로 rollout해 **단일스텝 품질**과 **drift**를 분리한다: teacher-forced(매 스텝 GT를 조건) vs autoregressive(자기 출력을 되먹임).
 
+:::{dropdown} 해부 — 조건 주입과 DDIM 샘플링 (`src/wm_diffusion.py` 발췌)
+**I/O**: `UNet(x_noisy (B,3,64,64), cond=x_t (B,3,64,64), t (B,), a (B,6)) → ε̂ (B,3,64,64)`. 조건 주입이 두 갈래다 — 직전 프레임은 **채널 concat**, action·timestep은 **임베딩 합산(FiLM식)**:
+
+```python
+def forward(self, x, cond, t, a):
+    e = self.temb(timestep_emb(t, 256)) + self.aemb(a)   # t·action → 임베딩 합
+    h = self.in_conv(torch.cat([x, cond], 1))            # 노이즈 프레임 ‖ 직전 프레임 = 6ch
+    ...ResBlock마다 h = h + emb(e)                        # FiLM식 주입
+
+@torch.no_grad()
+def ddim(self, model, cond, a, steps=30):                # 결정론 DDIM 30스텝
+    x = torch.randn(B, 3, 64, 64)
+    for i, t in enumerate(linspace(T-1, 0, steps)):
+        eps = model(x, cond, t, a)                       # ε 예측
+        x0 = (x - sqrt(1 - ᾱ_t) * eps) / sqrt(ᾱ_t)       # x0 복원 (clamp ±1)
+        x = sqrt(ᾱ_next) * x0 + sqrt(1 - ᾱ_next) * eps   # 다음 노이즈 레벨로 재구성
+
+# 두 rollout의 차이는 cond 한 줄이다:
+#   teacher-forced:  cond = GT[t]        (단일스텝 품질 측정)
+#   autoregressive:  cond = 직전 '생성' 프레임 (drift 노출 — 오차가 되먹여 누적)
+```
+
+teacher-forced 30.7dB 평평 vs autoregressive 30.6→22.1dB 급락이 이 `cond` 한 줄의 차이에서 나온다 — 생성형 world model의 drift가 모델 결함이 아니라 **자기회귀 구조의 성질**임을 분리해 보여주는 설계.
+:::
+
 <img src="_static/wm_diffusion_rollout.png" alt="Diffusion autoregressive rollout vs GT" style="width:100%;max-width:1000px;border-radius:8px">
 <img src="_static/wm_diffusion.png" alt="Diffusion loss and horizon PSNR" style="width:100%;max-width:1000px;border-radius:8px">
 
@@ -70,6 +164,22 @@ PlaNet의 잠재 동역학(RSSM)을 그대로 구현: 결정론 GRU 히스토리
 ## 6. W4 — pretrained V-JEPA-2 추론 probe
 
 W1이 **우리 시퀀스로 학습한** tiny 인코더였다면, 여기선 Meta의 **pretrained V-JEPA-2**(ViT-L, 326M, 우리 장면을 한 번도 못 봄)를 그대로 얼려 같은 질문을 던진다: frozen feature가 카메라 위치·depth를 선형으로 담고 있나? 16프레임 클립 → 2048 토큰(=8 temporal × 256 spatial)을 spatial 평균풀해 1024-d 표현을 얻고, W1과 **같은 held-out probe**를 돌린다.
+
+:::{dropdown} 해부 — frozen 모델 probe의 정확한 I/O (`src/wm_vjepa.py` 구조)
+학습 없음 — 인퍼런스 + 선형회귀뿐이다. 파이프라인:
+
+```text
+RGB 16프레임 클립 (HWC uint8, 256²)
+ └→ AutoVideoProcessor → VJEPA2Model(fp16, frozen) forward         [학습 모델, 추론만 ★]
+     └→ 출력 토큰 (2048, 1024) = 8 temporal group(tubelet 2) × 256 spatial patch
+         └→ spatial 평균풀 → temporal group당 1024-d 벡터 1개         [룰]
+             └→ 라벨 붙이기: 그 group이 덮는 프레임들의 GT 카메라 pose·평균 depth
+                 └→ ridge_probe_cv (W1과 동일: PCA-16 + ridge, 5-fold held-out)  [선형회귀]
+                     └→ R² per 축                                     [지표]
+```
+
+W1과 probe 코드가 **동일 함수**(`wm_jepa.ridge_probe_cv` import)라는 것이 비교의 공정성 장치다 — 다른 것은 표현을 만든 인코더뿐. caveat(64프레임용 모델에 16프레임, spatial 풀링)은 본문 그대로: 이 수치는 하한.
+:::
 
 <img src="_static/wm_vjepa.png" alt="V-JEPA-2 vs from-scratch probe R2" style="width:100%;max-width:760px;border-radius:8px">
 
@@ -106,6 +216,23 @@ W1–W4는 세 계열의 **목적함수·rollout 동역학을 우리가 밑바�
 
 `nicklashansen/tdmpc2`의 5M 단일태스크 체크포인트(cheetah-run)를 로드. 제어 성능은 5에피소드 return **863±12**(논문급). 더 중요한 건 이 에이전트 **내부의 학습된 latent world model**을 직접 뜯어본 것: 시작 잠재에서 에이전트가 실제로 취한 행동으로 open-loop rollout하고, 재인코딩한 실제 잠재와의 오차를 horizon별로 잰다 — latent-MSE $2.9\times10^{-5}$(h1) → $6.7\times10^{-3}$(h30), 보상예측 오차 0.006 → 0.12로 단조 증가. **W1/W2에서 본 horizon-drift 곡선을 진짜 SOTA RL 월드모델에서 그대로 재현**했다.
 
+:::{dropdown} 해부 — 남의 모델 내부를 재는 probe 코드 (`src/wm_tdmpc2.py` 발췌)
+체크포인트의 세 학습 모듈(`m.encode`, `m.next`, `m.reward`)을 우리가 짠 open-loop 루프(룰)로 묶어 잰다. **입력**: 에이전트가 실제 취한 (관측, 행동, 보상) 궤적. **출력**: horizon별 latent MSE·보상오차 곡선.
+
+```python
+Zreal = m.encode(O, None)                 # 전 관측을 잠재로 (T+1, latent) — 정답 궤적
+for s in range(0, T - H, stride):         # 시작점을 슬라이드하며 평균
+    z = Zreal[s:s+1]                      # 실제 잠재에서 출발
+    for h in range(H):
+        lat[h] += ((z - Zreal[s+h]) ** 2).mean()          # 굴린 잠재 vs 재인코딩 실제
+        rp = two_hot_inv(m.reward(z, A[s+h], None), cfg)  # 학습된 보상 헤드
+        rew[h] += abs(rp - rews[s+h])
+        z = m.next(z, A[s+h], None)       # 학습된 잠재 동역학으로 1스텝 (관측 안 봄)
+```
+
+`m.next`를 H번 연쇄하는 동안 관측을 한 번도 안 보는 것이 W2 imagination과 같은 프로토콜 — 그래서 곡선을 같은 축에 놓고 읽을 수 있다.
+:::
+
 <img src="_static/wm_tdmpc2_run.gif" alt="TD-MPC2 agent controlling cheetah-run" style="width:100%;max-width:720px;border-radius:8px"><br>
 <em>↑ 이 월드모델 에이전트가 실제로 굴린 cheetah-run 에피소드.</em>
 
@@ -132,6 +259,24 @@ W1–W4는 세 계열의 **목적함수·rollout 동역학을 우리가 밑바�
 ### W9 — V-JEPA 2-AC (공식 · 행동조건 예측 → 계획)
 
 Meta의 action-conditioned V-JEPA 2(ViT-g, **1.3B**)를 `torch.hub`로 로드, 레포 내장 **Franka 로봇 궤적**으로 정식 energy-landscape 프로브를 재현했다. 컨텍스트 프레임을 인코딩한 뒤 후보 3-D end-effector delta 그리드마다 미래 잠재를 예측하고 에너지 $=\lvert\hat z-z_{\text{real}}\rvert$를 잰다. 결과: **에너지 최소가 실제 행동 방향에 위치**하고(정방향 $(+,+,+)$ 옥탄트, 궤적을 뒤집으면 $(-,-,-)$로 정확히 반전) — 행동조건화가 진짜임을 반전 실험으로 증명. 최소-에너지 행동은 GT까지 0.048로 zero-action(0.129)보다 2.7× 가깝고, 내장 **CEM 플래너**는 월드모델만으로 실제 행동을 거리 **0.056**까지 복원한다(예측 월드모델 → 계획으로의 연결).
+
+:::{dropdown} 해부 — energy landscape의 정확한 계산 (`src/wm_vjepa2ac.py` 발췌)
+**입력**: 컨텍스트 프레임 잠재 `h`, 후보 행동 그리드(EE delta ±7.5cm, 5³=125개), 실제 다음 프레임 잠재. **출력**: 후보별 에너지 스칼라 125개. 모델 forward(학습 ★)는 `pred(z, A, s)` 한 줄이고 나머지는 룰이다:
+
+```python
+for da, db, dc in product(linspace(-0.075, 0.075, 5), repeat=3):
+    samp.append([da, db, dc, 0, 0, 0, 0])          # 후보 3-D EE delta (회전·그리퍼 0)
+A = torch.stack(samp)                               # (125, 1, 7)
+zt = pred(h[:, :tpf].repeat(125,1,1), A, state)     # ★ 각 후보로 미래 잠재 예측
+zt = F.layer_norm(zt, (zt.size(-1),))
+energy = torch.abs(zt - h[:, -tpf:]).mean(dim=[1,2])  # |예측 잠재 − 실제 다음 잠재|
+
+# 검증 설계: 궤적을 '뒤집어' 다시 계산 → 에너지 최소가 (+,+,+)에서 (−,−,−)로
+# 반전해야 진짜 행동조건화다 (프레임 유사도만 보는 모델이면 반전하지 않는다)
+```
+
+에너지 최소의 위치가 곧 "월드모델이 생각하는 실제 행동"이다 — CEM 플래너는 이 에너지를 목적함수로 후보 분포를 좁혀가는 것뿐이라, 예측 모델이 곧 플래너가 되는 구조를 코드로 보여준다.
+:::
 
 <img src="_static/wm_vjepa2ac.png" alt="V-JEPA 2-AC energy landscape forward vs reverse trajectory" style="width:100%;max-width:1000px;border-radius:8px">
 

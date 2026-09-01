@@ -6,7 +6,26 @@ ROBOTIS가 공개한 Physical AI 스택(MuJoCo 모델·핸드 URDF·데이터 �
 
 ## 1. AI Worker(FFW-BG2)로 guidance 파이프라인 이식 — 20/20
 
-[Manipulation](manipulation)의 물리 pick-and-place(Franka Panda, `mj_step` 접촉 물리로만 성공이 결정되는 폐루프)를 FFW-BG2의 **오른팔 7-DoF + RH-P12-RN 그리퍼**로 이식했다. 파이프라인 자체는 동일하다: 고정 카메라가 ArUco 물체를 보고(solvePnP) → DLS IK로 접근·파지 자세 → 그리퍼 CLOSE(위치서보, 힘 제한 ±3.5) → lift → carry → place. 물체 위치·yaw를 랜덤화한 20 trial.
+[Manipulation](manipulation)의 물리 pick-and-place(Franka Panda, `mj_step` 접촉 물리로만 성공이 결정되는 폐루프)를 FFW-BG2의 **오른팔 7-DoF + RH-P12-RN 그리퍼**로 이식했다. 파이프라인 자체는 동일하다: 고정 카메라가 ArUco 물체를 보고(solvePnP) → DLS IK로 접근·파지 자세 → 그리퍼 CLOSE(위치서보, 힘 제한 ±3.5) → lift → carry → place. 물체 위치·yaw를 랜덤화한 20 trial. 전 단계 룰베이스(기하+수치최적화) — [Manipulation 공통 해부](manipulation) 참조.
+
+:::{dropdown} 해부 — 이식에서 바뀐 것과 droop 폐루프 보정 (`src/robotis_pick.py` 발췌)
+알고리즘은 그대로고 바뀐 것은 **기체 상수와 보정 루프 하나**다. TCP 정의 `arm_r_link7 + (0,0,−0.175)`, IK는 오른팔 7-DoF만(`dof 14–20`), 그리퍼는 개도 스칼라 하나(`0=열림, 1.1=닫힘` — Panda의 255/0과 반대 방향 규약).
+
+```python
+# 실록 3번(중력 처짐)의 해부: FK 실측 잔차를 IK 타깃에 가산해 재명령 (2회)
+offset = np.zeros(3)
+for _ in range(2):
+    p_now, _ = tcp_pose(data, rig)          # ① FK로 TCP '실측' (명령값 아님)
+    resid = grasp_p - p_now                 # ② 처짐 잔차 (z −28mm / x −16mm 급)
+    if np.linalg.norm(resid) < 0.004:       #    4mm 안이면 종료
+        break
+    offset += resid                         # ③ 잔차를 타깃에 누적 가산
+    q_grasp, _ = solve(grasp_p + offset, q_grasp)   # ④ 올린 타깃으로 IK 재해석
+    sim(q_grasp, GRIP_OPEN, 200, cap)       # ⑤ 재명령 → 다시 처지면 한 번 더
+```
+
+**입력→출력**: 목표 TCP `(3,)` → 보정된 관절각 `(7,)`. 시뮬에선 FK가, 실기에선 엔코더 FK가 같은 역할을 한다 — 학습 없이 서보 강성 부족을 걷어내는 표준 폐루프. trial당 총 보정량 ≈47–52mm(영상 캡션의 그 수치).
+:::
 
 | 지표 | Franka Panda (40 trial) | **AI Worker FFW-BG2 (20 trial)** |
 |---|---|---|
@@ -50,6 +69,36 @@ ROBOTIS가 공개한 Physical AI 스택(MuJoCo 모델·핸드 URDF·데이터 �
 ## 2. MANO → ROBOTIS Hand HX5-D20 리타게팅 — Allegro 대비 잔차 1/2.7
 
 [Hand Pose](hand_pose)의 MANO→Allegro dexterous retargeting(vector-based keyvector 매칭, DexPilot/AnyTeleop 원리 — L-BFGS-B를 관절한계로 bound, 충돌 패널티, 스무딩/보간)에서 **타깃 핸드만 HX5-D20으로 교체**하고 같은 24프레임 open→fist 궤적을 다시 풀었다. 모델은 공식 `ffw_sh5.xml`을 무개조로 로드해 오른손 20관절만 구동한다(palm = `hx5_r_base`, 손 내부 geom 쌍만 충돌 집계).
+
+:::{dropdown} 해부 — keyvector 매칭 최적화의 실체 (`src/robotis_hand_retarget.py` 발췌)
+학습 없음 — 프레임당 **경계 있는 비선형 최소자승**(L-BFGS-B) 한 번씩이다. **입력**: MANO 관절 10점(palm 상대) + 스케일 s=1.55 + Kabsch 정렬 R. **출력**: 관절각 `(20,)` (한계 내 보장 — bound라서).
+
+```python
+def keyvectors(self, q):                     # 로봇 쪽: 관절각 → palm 상대 keypoint 10점
+    self.d.qpos[self.qid] = q
+    mj.mj_forward(self.m, self.d)            # FK
+    pts = [xpos[bid] (+ R_bid @ tip_offset) - palm  for bid, off in self.kp]
+    return np.array(pts)                     # (10,3): 5손가락 × medial+tip
+
+def retarget_frame(hand, vh, s, q0, R_align, w_col=0.0):
+    target = (s * vh) @ R_align.T            # 사람 keyvector를 로봇 스케일·프레임으로
+    def cost(q):
+        vr = hand.keyvectors(q)
+        e = ((vr - target) ** 2).sum()       # ① keyvector 매칭 (DexPilot 원리)
+        pinch_r = vr[9] - vr[1]              # ② 엄지팁−검지팁 상대벡터 ×1.5
+        e += 1.5 * ((pinch_r - pinch_h) ** 2).sum()   #    (파지에서 제일 중요한 관계)
+        if w_col:
+            e += w_col * hand.penetration() ** 2      # ③ 자기충돌 페널티 (w=400)
+        return e
+    return minimize(cost, q0, method="L-BFGS-B",      # ④ 관절한계 = bound
+                    bounds=zip(hand.lo, hand.hi), options=dict(maxiter=80))
+
+qs_raw  = solve(w_col=0.0)      # 표의 'raw' 열: 순수 매칭 (19.6mm, 충돌 17/24)
+qs_safe = solve(w_col=400.0)    # '충돌회피' 열: 페널티 켬 (21.4mm, 충돌 0)
+```
+
+이전 자세 `q0`를 warm-start로 넘기는 것이 프레임 간 연속성 장치이고, 사후에 이동평균 스무딩(w=5)+2× 보간이 jerk를 5.3× 줄인다. `penetration()`의 baseline-pair 제외(배포 모델 자체의 0-pose 관통 쌍을 빼고 집계)는 아래 실록 2번 참조.
+:::
 
 | 항목 | Allegro (16-DoF · 4손가락) | **HX5-D20 (20-DoF · 5손가락)** |
 |---|---|---|
