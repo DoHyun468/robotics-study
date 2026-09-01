@@ -248,6 +248,59 @@ python src/depth_compare.py
 - **솔버 자체 구현**: OpenCV 5.0 빌드에 `cv2.calibrateHandEye`가 없어(상수만 존재) 직접 구현했다. 회전은 축 정렬 Procrustes(SVD, `Rx = V Uᵀ`), translation은 `(R_A − I) t_X = R_X t_B − t_A` 최소자승으로 푼다.
 - 시뮬이므로 GT 카메라 pose와 직접 비교해 검증.
 
+:::{dropdown} 해부 — AX=XB 수식 전개: 왜 이 형태가 되고 어떻게 푸는가 (`src/hand_eye.py` 발췌)
+**분류**: 100% 룰베이스 — 닫힌형(SVD) + 최소자승. 학습은 물론 반복 최적화도 없다.
+**함수**: `solve_axxb(G: [T(4,4)] gripper→base(FK), C: [T(4,4)] marker→cam(PnP)) → (X: T(4,4) cam→base, n_pairs)`
+
+**무엇을 캘리브하는 것이 아닌가.** 카메라 내부 파라미터 $K$는 1단계에서 이미 알고, 로봇 FK(링크 길이·조인트 오프셋)도 정확하다고 믿는다. 이 단계가 푸는 건 이미 캘리브된 두 시스템을 **잇는 강체변환 $X$ 하나**다 — 카메라와 매니퓰레이터를 각각 다시 캘리브하는 게 아니다.
+
+**① 왜 AX=XB 형태가 되는가 — 미지수 2개 중 하나를 소거.** 미지수는 사실 둘이다: 구하려는 $X$(camera→base)와, 마커가 그리퍼에 어떤 오프셋으로 붙었는지인 $Y$(marker→gripper) — 마운트 변환도 정확히 모른다. 자세 $i$에서 marker→base를 두 경로(그리퍼 경유 vs 카메라 경유)로 쓰면 하나의 등식이 된다:
+
+$$ G_i\,Y = X\,C_i $$
+
+자세 쌍 $(i,j)$에서 $Y = G_i^{-1} X C_i = G_j^{-1} X C_j$ 로 $Y$를 **소거**하면:
+
+$$ \underbrace{(G_j G_i^{-1})}_{A}\,X = X\,\underbrace{(C_j C_i^{-1})}_{B} $$
+
+$A$ = base 좌표계가 본 그리퍼 상대운동, $B$ = 카메라 좌표계가 본 마커 상대운동. **같은 물리적 움직임을 두 좌표계가 다르게 본 것**이고, 그 차이가 정확히 $X$다. 절대 pose가 아니라 상대운동 쌍을 쓰는 이유가 바로 $Y$ 소거다. 29자세 → 405쌍(상대회전 8° 미만은 회전축 추정이 노이즈에 취약해 버림).
+
+**② 회전 — conjugation은 회전축만 돌린다.** $4{\times}4$를 블록으로 쪼개면 회전 부분은 $R_A R_X = R_X R_B$, 즉 $R_A = R_X R_B R_X^\top$ (conjugation). 항등식 $R\,e^{[\omega]_\times}R^\top = e^{[R\omega]_\times}$ 에 의해 conjugation은 **회전각을 보존하고 축만 돌린다**. 각 쌍의 axis-angle 벡터 $\alpha_k = \log R_{A,k}$, $\beta_k = \log R_{B,k}$ 에 대해:
+
+$$ \alpha_k = R_X\,\beta_k $$
+
+즉 점 정합이 아니라 **운동축 정합** 문제다(Park–Martin). $\min_R \sum_k \|\alpha_k - R\beta_k\|^2 = \max_R\,\mathrm{tr}(R\,M)$, $M = \sum_k \beta_k \alpha_k^\top$ 이고, SVD $M = U\Sigma V^\top$ 에서 $R_X = V U^\top$ (Procrustes/Wahba, $\det<0$이면 반사 보정). 축 $\beta_k$가 전부 평행하면 그 축 둘레 회전이 미정으로 남는다 — "회전 다양성 = observability"의 수식적 이유.
+
+**③ translation — $R_X$를 대입하면 선형이 된다.** translation 블록은 $R_A t_X + t_A = R_X t_B + t_X$, 정리하면:
+
+$$ (R_A - I)\,t_X = R_X\,t_B - t_A $$
+
+쌍마다 3개의 선형식. 단 $(R_A - I)$는 **특이행렬**이다($A$의 회전축 $v$는 $(R_A - I)v = 0$) — 한 쌍만으론 축 방향 성분이 미정이라, 여기서도 축이 다른 쌍이 2개 이상 필요하다. 405쌍을 세로로 쌓아 최소자승.
+
+```python
+for i in range(n):
+    for j in range(i + 1, n):
+        A = G[j] @ inv_T(G[i])          # 그리퍼 상대운동 (base 좌표계)
+        B = C[j] @ inv_T(C[i])          # 마커 상대운동 (cam 좌표계)
+        a = cv2.Rodrigues(A[:3, :3])[0].ravel()      # α_k: axis-angle
+        b = cv2.Rodrigues(B[:3, :3])[0].ravel()      # β_k
+        if np.degrees(np.linalg.norm(a)) < min_deg:  # <8°: 축 추정 불안정 → 버림
+            continue
+        alphas.append(a); betas.append(b)
+        AR.append(A[:3, :3]); At.append(A[:3, 3]); Bt.append(B[:3, 3])
+M = betas.T @ alphas                    # M = Σ β_k α_k^T
+U, _, Vt = np.linalg.svd(M)
+Rx = Vt.T @ U.T                         # ② argmax tr(Rx M) — Procrustes
+if np.linalg.det(Rx) < 0:
+    Vt = Vt.copy(); Vt[2] *= -1; Rx = Vt.T @ U.T
+Amat = np.vstack([R - np.eye(3) for R in AR])                    # ③ (R_A − I) 쌓기
+bvec = np.concatenate([Rx @ tb - ta for ta, tb in zip(At, Bt)])  #    R_X t_B − t_A
+tx, *_ = np.linalg.lstsq(Amat, bvec, rcond=None)
+return to_T(Rx, tx), len(alphas)
+```
+
+회전을 먼저 풀고 translation에 대입하는 **순차(separable) 방식**이라 회전 오차가 translation으로 전파된다 — Tsai–Lenz·Park–Martin 계열의 공통 구조. 회전·이동을 dual quaternion으로 동시에 푸는 방법(Daniilidis)도 있다 — [3D 변환 노트](vision/transforms-3d.md) 참고. 소거했던 $Y$(마커 마운트)가 필요하면 $Y = G_i^{-1} X C_i$ 로 사후 복원할 수 있다.
+:::
+
 ### 결과 (29/30 자세, 405 포즈쌍)
 
 | 지표 | 값 |
