@@ -254,23 +254,42 @@ python src/depth_compare.py
 
 **무엇을 캘리브하는 것이 아닌가.** 카메라 내부 파라미터 $K$는 1단계에서 이미 알고, 로봇 FK(링크 길이·조인트 오프셋)도 정확하다고 믿는다. 이 단계가 푸는 건 이미 캘리브된 두 시스템을 **잇는 강체변환 $X$ 하나**다 — 카메라와 매니퓰레이터를 각각 다시 캘리브하는 게 아니다.
 
-**① 왜 AX=XB 형태가 되는가 — 미지수 2개 중 하나를 소거.** 미지수는 사실 둘이다: 구하려는 $X$(camera→base)와, 마커가 그리퍼에 어떤 오프셋으로 붙었는지인 $Y$(marker→gripper) — 마운트 변환도 정확히 모른다. 자세 $i$에서 marker→base를 두 경로(그리퍼 경유 vs 카메라 경유)로 쓰면 하나의 등식이 된다:
+**⓪ 곱이 붙는 순서 — 아래첨자 소거 규칙.** $T_{a\to b}$는 $a$ 좌표계로 표현된 점을 $b$ 좌표계 표현으로 바꾸는 $4{\times}4$다: $p_b = T_{a\to b}\,p_a$. 체인 규칙은
 
-$$ G_i\,Y = X\,C_i $$
+$$ T_{a\to c} = T_{b\to c}\,T_{a\to b} $$
 
-자세 쌍 $(i,j)$에서 $Y = G_i^{-1} X C_i = G_j^{-1} X C_j$ 로 $Y$를 **소거**하면:
+— **오른쪽 변환이 점에 먼저 작용**하고, 맞닿은 아래첨자($b$)가 소거되는 방향으로만 곱이 붙는다. 그래서 "마커 위의 점을 base로 보내는" 두 경로는 이렇게 붙는다:
+
+$$ T_{m\to b} \;=\; \underbrace{G_i}_{g\to b}\,\underbrace{Y}_{m\to g} \;=\; \underbrace{X}_{c\to b}\,\underbrace{C_i}_{m\to c} $$
+
+오른쪽→왼쪽으로 읽으면 경로 그대로다: 마커점이 $Y$로 그리퍼 좌표가 되고 $G_i$로 base에 도착 vs $C_i$로 카메라 좌표가 되고 $X$로 base에 도착.
+
+**① 왜 AX=XB 형태가 되는가 — 미지수 2개 중 하나를 소거.** 미지수는 사실 둘이다: 구하려는 $X$(camera→base)와, 마커가 그리퍼에 어떤 오프셋으로 붙었는지인 $Y$(marker→gripper) — 마운트 변환도 정확히 모른다. 위 등식 $G_i Y = X C_i$는 모든 자세에서 성립하므로, 자세 쌍 $(i,j)$에서 $Y$로 정리해 소거한다:
+
+$$ Y = G_i^{-1} X C_i = G_j^{-1} X C_j $$
+
+양변 왼쪽에 $G_j$, 오른쪽에 $C_i^{-1}$을 곱하면:
 
 $$ \underbrace{(G_j G_i^{-1})}_{A}\,X = X\,\underbrace{(C_j C_i^{-1})}_{B} $$
 
 $A$ = base 좌표계가 본 그리퍼 상대운동, $B$ = 카메라 좌표계가 본 마커 상대운동. **같은 물리적 움직임을 두 좌표계가 다르게 본 것**이고, 그 차이가 정확히 $X$다. 절대 pose가 아니라 상대운동 쌍을 쓰는 이유가 바로 $Y$ 소거다. 29자세 → 405쌍(상대회전 8° 미만은 회전축 추정이 노이즈에 취약해 버림).
 
-**② 회전 — conjugation은 회전축만 돌린다.** $4{\times}4$를 블록으로 쪼개면 회전 부분은 $R_A R_X = R_X R_B$, 즉 $R_A = R_X R_B R_X^\top$ (conjugation). 항등식 $R\,e^{[\omega]_\times}R^\top = e^{[R\omega]_\times}$ 에 의해 conjugation은 **회전각을 보존하고 축만 돌린다**. 각 쌍의 axis-angle 벡터 $\alpha_k = \log R_{A,k}$, $\beta_k = \log R_{B,k}$ 에 대해:
+**② 왜 $A$는 $X$의 왼쪽, $B$는 오른쪽인가 — 묶는 순서가 좌표계를 정한다.** 상대운동은 두 방향으로 묶을 수 있고 **뜻이 다르다**:
+
+- $G_j G_i^{-1}$ (인버스가 오른쪽): base의 점을 $G_i^{-1}$로 자세 $i$의 그리퍼 좌표로 내렸다가 $G_j$로 자세 $j$의 base 좌표로 올린다 → 그리퍼에 박힌 점의 $i{\to}j$ 변위를 **base 좌표계에서** 기술.
+- $G_i^{-1} G_j$ (인버스가 왼쪽): 같은 변위를 **그리퍼 자신(body) 좌표계에서** 기술.
+
+$Y$ 소거 대수는 자동으로 앞쪽 묶음을 만든다 — $A$는 base 언어, $B$는 cam 언어. 그러면 $AX = XB$는 $A = X B X^{-1}$, 즉 **좌표계 바꿔치기(conjugation)** 그 자체다: base의 점을 $X^{-1}$로 cam 좌표로 내리고, cam이 본 변위 $B$를 적용하고, $X$로 다시 base로 올리면 base가 본 변위 $A$와 같아야 한다. 아래첨자로도 확인된다 — $X = T_{c\to b}$의 오른쪽엔 cam 언어($B$)만, 왼쪽엔 base 언어($A$)만 맞닿을 수 있다.
+
+덤: 반대로 묶으면 $(G_i^{-1}G_j)\,Y = Y\,(C_i^{-1}C_j)$ — 같은 데이터에서 **다른 미지수 $Y$**(마커 마운트)에 대한 AX=XB가 나온다. 곱 순서가 곧 "어느 미지수를 푸느냐"를 결정한다.
+
+**③ 회전 — conjugation은 회전축만 돌린다.** $4{\times}4$를 블록으로 쪼개면 회전 부분은 $R_A R_X = R_X R_B$, 즉 $R_A = R_X R_B R_X^\top$ (conjugation). 항등식 $R\,e^{[\omega]_\times}R^\top = e^{[R\omega]_\times}$ 에 의해 conjugation은 **회전각을 보존하고 축만 돌린다**. 각 쌍의 axis-angle 벡터 $\alpha_k = \log R_{A,k}$, $\beta_k = \log R_{B,k}$ 에 대해:
 
 $$ \alpha_k = R_X\,\beta_k $$
 
 즉 점 정합이 아니라 **운동축 정합** 문제다(Park–Martin). $\min_R \sum_k \|\alpha_k - R\beta_k\|^2 = \max_R\,\mathrm{tr}(R\,M)$, $M = \sum_k \beta_k \alpha_k^\top$ 이고, SVD $M = U\Sigma V^\top$ 에서 $R_X = V U^\top$ (Procrustes/Wahba, $\det<0$이면 반사 보정). 축 $\beta_k$가 전부 평행하면 그 축 둘레 회전이 미정으로 남는다 — "회전 다양성 = observability"의 수식적 이유.
 
-**③ translation — $R_X$를 대입하면 선형이 된다.** translation 블록은 $R_A t_X + t_A = R_X t_B + t_X$, 정리하면:
+**④ translation — $R_X$를 대입하면 선형이 된다.** translation 블록은 $R_A t_X + t_A = R_X t_B + t_X$, 정리하면:
 
 $$ (R_A - I)\,t_X = R_X\,t_B - t_A $$
 
@@ -289,10 +308,10 @@ for i in range(n):
         AR.append(A[:3, :3]); At.append(A[:3, 3]); Bt.append(B[:3, 3])
 M = betas.T @ alphas                    # M = Σ β_k α_k^T
 U, _, Vt = np.linalg.svd(M)
-Rx = Vt.T @ U.T                         # ② argmax tr(Rx M) — Procrustes
+Rx = Vt.T @ U.T                         # ③ argmax tr(Rx M) — Procrustes
 if np.linalg.det(Rx) < 0:
     Vt = Vt.copy(); Vt[2] *= -1; Rx = Vt.T @ U.T
-Amat = np.vstack([R - np.eye(3) for R in AR])                    # ③ (R_A − I) 쌓기
+Amat = np.vstack([R - np.eye(3) for R in AR])                    # ④ (R_A − I) 쌓기
 bvec = np.concatenate([Rx @ tb - ta for ta, tb in zip(At, Bt)])  #    R_X t_B − t_A
 tx, *_ = np.linalg.lstsq(Amat, bvec, rcond=None)
 return to_T(Rx, tx), len(alphas)
