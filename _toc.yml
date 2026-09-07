@@ -121,3 +121,9 @@ parts:
           - file: world-models/diamond
           - file: world-models/cosmos
       - file: reviews/_template
+  - caption: Tech Archive
+    chapters:
+      - file: archive/index
+        sections:
+          - file: archive/vla-lineage
+          - file: archive/2026-09-04-pi0-flow-vla
