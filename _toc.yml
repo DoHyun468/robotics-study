@@ -19,6 +19,15 @@ parts:
       - file: context
       - file: wm
       - file: wm_math
+  - caption: Benchmarks & Task Suites
+    chapters:
+      - file: benchmarks/index
+        sections:
+          - file: benchmarks/dmcontrol
+          - file: benchmarks/metaworld
+          - file: benchmarks/maniskill
+          - file: benchmarks/myosuite
+          - file: benchmarks/libero
   - caption: Hand & Human Pose
     chapters:
       - file: hand_pose
