@@ -10,6 +10,7 @@ parts:
     chapters:
       - file: slam
       - file: slam_math
+      - file: av_stack
   - caption: Learned Grasping, Policies & World Models
     chapters:
       - file: grasp_sota
