@@ -28,6 +28,7 @@ parts:
           - file: benchmarks/maniskill
           - file: benchmarks/myosuite
           - file: benchmarks/libero
+          - file: benchmarks/datasets
   - caption: Hand & Human Pose
     chapters:
       - file: hand_pose

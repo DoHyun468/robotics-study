@@ -42,6 +42,7 @@
 - [ManiSkill](maniskill.md) — SAPIEN 위 대규모 조작(20 태스크 패밀리·2000+ 물체·시연 4M+ 프레임).
 - [MyoSuite](myosuite.md) — 토크가 아니라 **근육**으로 구동하는 제어(39근육 손).
 - [LIBERO](libero.md) — 언어 조건 조작 벤치(130태스크) — **우리가 OpenVLA로 직접 돌린** 곳.
+- [데이터셋 지도](datasets.md) — 환경 벤치가 아닌 **데이터셋** 생태계: 수집→어노테이션→태스크 정의→리더보드의 표준 파이프라인, "태스크는 누가 만드나"의 세 패턴.
 
 ## 3. 한 장 비교표
 
@@ -56,8 +57,8 @@
 ## 4. 여기 없는 이름들 — 지도 완성용 한 줄씩
 
 - **Atari (ALE)**: 픽셀 입력·**이산 행동** 게임 57종 — [DreamerV2](../world-models/dreamerv2.md)·[MuZero](../world-models/muzero.md)의 무대. **Atari 100k**는 같은 게임을 "10만 스텝(≈2시간)만 상호작용" 제한으로 채점하는 **샘플효율 벤치**([IRIS](../world-models/iris.md)·[DIAMOND](../world-models/diamond.md)).
-- **D4RL**: 오프라인 RL **데이터셋** 모음(locomotion·미로 등) — 환경이 아니라 기록으로 배운다. [Decision Transformer](../world-models/decision-transformer.md)·[TT](../world-models/trajectory-transformer.md)의 채점장.
-- **Open X-Embodiment(OXE)**: 다로봇 **시연 데이터셋**(~1M 궤적) — [OpenVLA](../reviews/openvla.md) 사전학습의 원료. 벤치가 아니라 공급망.
+- **D4RL**: 오프라인 RL **데이터셋** 모음(locomotion·미로 등) — 환경이 아니라 기록으로 배운다([데이터셋 지도](datasets.md) §3.5). [Decision Transformer](../world-models/decision-transformer.md)·[TT](../world-models/trajectory-transformer.md)의 채점장.
+- **Open X-Embodiment(OXE)**: 다로봇 **시연 데이터셋**(~1M 궤적) — [OpenVLA](../reviews/openvla.md) 사전학습의 원료. 벤치가 아니라 공급망([데이터셋 지도](datasets.md) §3.1).
 - **Crafter·Minecraft·ProcGen**: 절차 생성·장기 과제 축 — [DreamerV3](../world-models/dreamerv3.md)의 "150+ 태스크"를 구성하는 나머지 도메인들.
 
 **읽는 감각 하나로 마무리**: 벤치 이름 옆의 숫자(39, 50, 104…)는 난이도가 아니라 **커버리지**다. 진짜 정보는 (1) 관측이 상태인가 픽셀인가, (2) 행동이 연속인가 이산인가, (3) 채점이 return인가 성공률인가, (4) 상호작용 예산이 얼마인가 — 이 네 축이 같아야 두 논문의 막대를 나란히 읽을 수 있다.
