@@ -6,3 +6,4 @@
 |---|---|---|---|
 | 상설 | — | [VLA 계보 지도](vla-lineage.md) | 종합 |
 | 1 | 2026-09-04 | [π0: Flow Matching VLA](2026-09-04-pi0-flow-vla.md) | arXiv 2410.24164 |
+| 2 | 2026-09-07 | [WISE: 월드모델 상상 스케줄링 VLA 사후학습](2026-09-07-wise-world-model-vla.md) | arXiv 2609.03681 |
