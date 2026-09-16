@@ -73,11 +73,52 @@ video, img { max-width: 100%; height: auto; }
 }
 
 /* --- independent sidebar scroll: sidebar has its own scrollbar, decoupled
-       from main content height (no need to scroll the page to see its bottom) --- */
-.bd-sidebar-primary {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  max-height: 100vh;
-  overflow-y: auto;
+       from main content height (no need to scroll the page to see its bottom).
+       데스크톱 한정 — 모바일에선 테마의 오프캔버스 드로어(position:fixed)를 건드리면 안 된다 --- */
+@media (min-width: 960px) {
+  .bd-sidebar-primary {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+}
+
+/* ---- 모바일 가로 팬 버그 수정 ----
+   테마는 닫힌 드로어를 화면 밖(margin -75%)에 visibility:hidden으로 주차하지만,
+   자손 요소들이 visibility를 visible로 되돌려 화면 밖에 실제로 그려진다.
+   안드로이드 크롬은 이 오프스크린 콘텐츠까지 가로 팬 영역으로 잡는다(본문이 옆으로 밀리는 증상).
+   닫힌 동안엔 자손까지 강제로 숨긴다 — 열면(:checked) 규칙이 풀려 원래대로 동작. */
+@media (max-width: 1199.98px) {
+  /* 우측 TOC가 드로어로 동작하는 구간 */
+  input#pst-secondary-sidebar-checkbox:not(:checked) ~ .bd-container .bd-sidebar-secondary,
+  input#pst-secondary-sidebar-checkbox:not(:checked) ~ .bd-container .bd-sidebar-secondary * {
+    visibility: hidden !important;
+  }
+}
+@media (max-width: 959.98px) {
+  /* 좌측 사이드바가 드로어로 동작하는 구간 */
+  input#pst-primary-sidebar-checkbox:not(:checked) ~ .bd-container .bd-sidebar-primary,
+  input#pst-primary-sidebar-checkbox:not(:checked) ~ .bd-container .bd-sidebar-primary * {
+    visibility: hidden !important;
+  }
+}
+
+/* ---- 모바일 가로 넘침 방지 ----
+   넓은 요소(표·코드블록·수식)가 페이지 폭을 늘리면 본문 전체가 가로로 밀린다.
+   원칙: 넓은 것은 "자기 컨테이너 안에서만" 스크롤하고, 페이지 자체는 절대 가로 스크롤하지 않는다. */
+.bd-main .bd-content, .bd-article-container, article.bd-article { min-width: 0; }
+
+article.bd-article table {
+  display: block;            /* 표가 뷰포트보다 넓으면 표 안에서만 가로 스크롤 */
+  overflow-x: auto;
+  max-width: 100%;
+  width: fit-content;        /* 좁은 표는 원래 폭 유지 */
+}
+article.bd-article pre { overflow-x: auto; max-width: 100%; }
+mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+
+@media (max-width: 960px) {
+  html, body { overflow-x: hidden; }   /* 최후 방어선 — 페이지 레벨 가로 팬 차단 */
 }
