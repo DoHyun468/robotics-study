@@ -139,3 +139,4 @@ parts:
           - file: archive/vla-lineage
           - file: archive/2026-09-04-pi0-flow-vla
           - file: archive/2026-09-07-wise-world-model-vla
+          - file: archive/2026-09-30-tdmpc2-scalable-world-models
