@@ -1,6 +1,6 @@
 # World Models — hands-on (예측·상상·생성)
 
-[SLAM](slam.md)이 "**관측 → 상태**"(움직이는 센서의 궤적·지도를 관측만으로 복원)라면, world model은 그 반대 방향 — "**상태 → 미래 관측/표현**"(지금까지의 상태와 행동으로 다음에 무엇이 관측될지 예측)을 푼다. 이 사이트의 [World Models 리뷰 트랙](world-models/latent.md)이 논문을 정리한 **읽기** 트랙이라면, 이 페이지는 그 세 계열(예측형·시퀀스형·생성형)을 **우리가 직접 구현·학습하고 같은 MuJoCo GT 시퀀스 위에서 측정한** hands-on 트랙이다.
+[SLAM](slam.md)이 "**관측 → 상태**"(움직이는 센서의 궤적·지도를 관측만으로 복원)라면, world model은 그 반대 방향 — "**상태 → 미래 관측/표현**"(지금까지의 상태와 행동으로 다음에 무엇이 관측될지 예측)을 푼다. 이 사이트의 [World Models 리뷰 트랙](world-models/latent.md)이 논문을 정리한 **읽기** 트랙이라면, 이 페이지는 그 세 계열(예측형·시퀀스형·생성형 — 갈래 간 차이는 [네 갈래 가로 비교](world-models/four-families.md) 참고)을 **우리가 직접 구현·학습하고 같은 MuJoCo GT 시퀀스 위에서 측정한** hands-on 트랙이다.
 
 포지셔닝: **3D perception → localization/mapping(SLAM) → 예측적 공간지능(world model)**. SLAM에서 만든 시퀀스·GT pose를 그대로 재사용하므로, "기하를 재구성하는 능력"이 "미래를 예측·상상하는 능력"으로 한 줄 이어진다.
 

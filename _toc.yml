@@ -106,6 +106,7 @@ parts:
           - file: reviews/dexcap
           - file: reviews/grab
           - file: reviews/hot3d
+      - file: world-models/four-families
       - file: world-models/latent
         sections:
           - file: world-models/world-models-2018
