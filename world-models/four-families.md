@@ -47,30 +47,84 @@
 
 ### ① Dreamer 계열 — 재구성 기반 + 상상 학습 (계보의 뿌리)
 
-- 계보: Dream to Control(V1, 2020) → [V2](dreamerv2.md)(2021, Atari) → [V3](dreamerv3.md)(2023).
-- **학습 루프 3박자**: ⑴ 실환경에서 데이터 수집 → ⑵ world model 학습(관측 **재구성** + 보상 + 에피소드 지속 예측, posterior↔prior KL 정렬) → ⑶ **상상 rollout(H≈15) 안에서 actor-critic 학습**(λ-return). 정책이 실데이터가 아니라 꿈에서 배운다는 게 요점.
-- 버전 차: V2 = 잠재를 가우시안→**범주형 32×32**로 바꿔 이산·다봉 동역학(Atari)에서 인간급. V3 = **symlog**(보상·가치 스케일 압착)·**twohot**(스칼라를 이산 분포로 회귀)·free bits로 견고화 → 150+ 태스크를 단일 하이퍼파라미터로, Minecraft 다이아몬드를 사람 데이터 없이 최초 달성.
-- 약점 한 줄(다음 갈래로 잇는 다리): 재구성이라 **태스크와 무관한 픽셀 디테일에 모델 용량을 낭비**한다 — 이 지점을 ②는 "재구성 제거"로, ③은 "표현만 예측"으로, ④는 "반대로 더 잘 그리기"로 친다.
+계보: Dream to Control(V1, 2020) → [V2](dreamerv2.md)(2021, Atari) → [V3](dreamerv3.md)(2023, arXiv 2301.04104).
 
-### ② TD-MPC2 — 이름이 곧 설계도
+**학습 루프 3박자**: ⑴ 실환경에서 데이터 수집 → ⑵ world model 학습 → ⑶ **상상 rollout(H≈15) 안에서 actor-critic 학습**(λ-return). 정책이 실데이터가 아니라 꿈에서 배운다는 게 요점이고, 실환경 1스텝당 상상 수십 스텝이 나오는 것이 샘플 효율의 원천이다.
 
-- **TD-MPC = "Temporal Difference learning for Model Predictive Control"** — **지평 안(H=5)은 모델로 계획(MPC, 구현은 MPPI)하고, 지평 밖의 먼 미래는 TD로 배운 Q함수가 요약**한다. "지평 안은 모델이, 지평 밖은 가치가".
-- 왜 이 결합인가: 계획만 하면(PlaNet류) 지평 밖을 못 보는 근시안이 되고, 정책만 두면(SAC류) 실행 순간의 추가 최적화가 없다 — 둘을 연속제어에서 합친 게 [TD-MPC](tdmpc.md)(2022, DMControl Dog 최초 해결).
-- 모델 이름 TOLD(**T**ask-**O**riented **L**atent **D**ynamics): 인코더·잠재 dynamics·보상·Q·정책 5부품, **디코더 없음(재구성 없음)**. 대신 **잠재 일관성 손실** — "내가 예측한 다음 잠재 ≈ 다음 관측을 인코딩한 것" — 로 관측에 정박한다. 정책은 답이 아니라 MPPI 샘플의 warm-start prior다.
-- **TD-MPC2(2023)** = 스케일·멀티태스크판: 단일 하이퍼로 104태스크, 317M 단일 에이전트가 80태스크(모델을 키울수록 단조 향상 — "월드모델 RL도 스케일이 된다"). 수식 전개는 [아카이브 리포트](../archive/2026-09-30-tdmpc2-scalable-world-models.md).
-- **이 사이트의 hands-on**: 공식 5M 체크포인트(cheetah-run)를 로드해 제어 return 863±12(논문급)를 재현하고, 그 안의 학습된 잠재 모델을 직접 해부했다 — open-loop rollout의 잠재 오차가 h1 2.9e-5 → h30 6.7e-3로 단조 증가함을 실측(= compounding error를 SOTA 모델 내부에서 재현). [wm.md](../wm.md)의 W6.
+**RSSM의 핵심 — posterior/prior 한 쌍.** 상태를 결정론적 h(GRU 히든, 장기 기억)와 확률적 z(다봉 불확실성)로 나누고, 관측을 **보고** 상태를 추정하는 posterior $q(z_t\mid h_t,o_t)$와 관측 **없이** 다음을 예측하는 prior $p(z_t\mid h_t)$를 KL로 붙여 학습한다. 그래서 관측이 없는 상상 중에도 prior만으로 미래가 굴러간다 — "상상은 prior로 돈다". 잠재는 V2부터 가우시안이 아니라 **범주형 32×32**(straight-through gradient)인데, Atari처럼 이산·다봉인 동역학에서 가우시안 잠재가 모드를 뭉개는 문제를 피하기 위해서다.
+
+**V3의 견고성 기법 — "튜닝 지옥"을 "레시피"로.** V3의 기여는 새 구조가 아니라, 도메인마다 보상 스케일·관측 분포가 극단적으로 달라도 **하이퍼파라미터 하나로** 돌게 만든 안정화 묶음이다:
+
+- **symlog 예측**: $\operatorname{symlog}(x)=\operatorname{sign}(x)\ln(1+|x|)$ — 보상·가치처럼 스케일이 제각각인 타깃을 압착 공간에서 예측하고 symexp로 복원. 큰 값의 gradient 폭발과 작은 값의 무시를 동시에 완화.
+- **twohot 이산 회귀**: 스칼라를 고정 bin 격자 위 이웃 두 bin에 선형 분배한 soft 분포로 바꿔 분류 손실로 학습 — 회귀보다 넓은 동적 범위에서 안정.
+- **free bits + KL balancing**: dynamics/representation 두 KL을 나누고 각각 1 nat 아래로는 벌하지 않는다($\mathcal{L}=\max(1,\mathrm{KL})$) — 작은 KL 과최적화로 인한 표현 붕괴 방지.
+- **unimix**: 범주형 확률에 1% 균등분포를 섞어 0 확률로 인한 KL 발산 방지.
+- **percentile return normalization**: 상상 return을 배치의 5~95 백분위 폭으로 나눠 actor 스텝 크기를 도메인 불문 일정하게.
+
+**결과(원문 대조)**: 8개 도메인 150+ 태스크를 동일 하이퍼로 — Atari 200M median 302%(V2 219%), Crafter SOTA, DMLab에서 IMPALA 최종 성능을 **130배 적은 데이터**로, 그리고 **Minecraft 다이아몬드를 사람 데이터·커리큘럼 없이 최초 채굴**(40시드 중 24시드). 모델을 XS(8M)→XL(200M)로 키우면 성능·데이터 효율이 **단조 상승** — "레시피 하나로 크기만 키우면 된다".
+
+**약점 한 줄(다음 갈래로 잇는 다리)**: 재구성 기반이라 **태스크와 무관한 픽셀 디테일에 모델 용량을 낭비**한다. 이 지점을 ②는 "재구성 제거"로, ③은 "표현만 예측"으로, ④는 "반대로 더 잘 그리기"로 친다. 상세 리뷰: [V1](dreamer.md) · [V2](dreamerv2.md) · [V3](dreamerv3.md) (버전 비교표 포함).
+
+### ② TD-MPC / TD-MPC2 — 이름이 곧 설계도
+
+**TD-MPC = "Temporal Difference learning for Model Predictive Control"**(ICML 2022, arXiv 2203.04955). **지평 안(H=5)은 모델로 계획(MPC, 구현은 MPPI)하고, 지평 밖의 먼 미래는 TD로 배운 Q함수가 요약한다** — "지평 안은 모델이, 지평 밖은 가치가".
+
+**왜 이 결합인가.** 기존 구도의 양극단이 각자 반쪽이었다: [PlaNet](planet.md)류(모델+계획)는 지평 너머를 못 보는 근시안이고, SAC류(정책+가치)는 실행 순간의 추가 최적화가 없다. [MuZero](muzero.md)가 둘을 결합했지만 MCTS라 이산 행동 전용 — TD-MPC는 그 철학을 **연속 행동**으로 가져온 실용판이고, DMControl Dog 태스크를 최초로 풀었다.
+
+**모델 TOLD(Task-Oriented Latent Dynamics) — 5부품, 디코더 없음:**
+
+$$z_t = h_\theta(s_t),\quad \hat z_{t+1}=d_\theta(z_t,a_t),\quad \hat r_t=R_\theta(z_t,a_t),\quad \hat q_t=Q_\theta(z_t,a_t),\quad \hat a_t\sim\pi_\theta(z_t)$$
+
+손실은 세 항의 공동 최적화 — 보상 예측 + 가치 TD + **잠재 일관성**:
+
+$$\|\hat r - r\|^2 + c_2\,\big\|Q_\theta(z,a)-(r+\gamma Q_{\theta^-}(z',\pi_\theta(z')))\big\|^2 + c_3\,\big\|d_\theta(z,a)-h_{\theta^-}(s')\big\|^2$$
+
+셋째 항이 재료다: "내가 예측한 다음 잠재 ≈ 다음 관측을 인코딩한 것" — 재구성 없이도 동역학을 관측에 정박시키는 장치로, MuZero(정박 없음)와 PlaNet(픽셀 재구성 정박)의 정확히 중간 지점이다.
+
+**계획 — MPPI + 가치 terminal + 정책 warm-start:**
+
+$$\phi_\Gamma = \mathbb{E}\Big[\underbrace{\textstyle\sum_t^H \gamma^t R_\theta(z_t,a_t)}_{\text{지평 안: 모델로 정밀 평가}} + \underbrace{\gamma^H Q_\theta(z_H,a_H)}_{\text{지평 밖: 가치가 요약}}\Big]$$
+
+정책 $\pi_\theta$는 답이 아니라 **MPPI 샘플 풀의 warm-start prior** — 좋은 초기값 공급자다. terminal Q 덕에 지평이 5로 짧아도 근시안이 안 된다.
+
+**TD-MPC2(2023, arXiv 2310.16828) = 스케일·멀티태스크판.** 단일 하이퍼로 **104개 연속제어 태스크**, 317M 단일 에이전트가 80태스크를 동시에 — 5M→317M로 키울수록 평균 정규화 점수 16.0→70.6 단조 상승("월드모델 RL도 스케일이 된다"). 안정화 장치로 잠재를 simplex로 정규화하는 **SimNorm**, 보상·가치의 **101-bin 이산 회귀**(log 변환 + cross-entropy) 도입. 수식 전개·피겨는 [아카이브 리포트](../archive/2026-09-30-tdmpc2-scalable-world-models.md).
+
+**이 사이트의 hands-on**([wm.md](../wm.md) W6): 공식 5M 체크포인트(cheetah-run)를 로드해 제어 return **863±12**(논문급)를 재현하고, 학습된 모델의 open-loop 잠재 rollout 오차를 직접 계측했다 — h=1에서 2.9e-5, h=30에서 6.7e-3로 단조 증가. compounding error를 SOTA 모델 내부에서 실측한 것이고, 논문이 짧은 지평+terminal 가치를 택한 이유의 실측 증거다.
+
+**약점**: 잠재가 보상·가치로만 형성되므로 **보상이 성긴 태스크에선 표현이 빈약**해질 수 있다(재구성의 반대 극단이 갖는 위험). 매 스텝 MPPI 비용도 고주파 실로봇 루프엔 부담(Humanoid 기준 SAC 대비 wall-time 수 배). 상세 리뷰: [TD-MPC](tdmpc.md).
 
 ### ③ V-JEPA 계열 — 표현 예측 (실로봇 계획 최전선)
 
-- **JEPA = "Joint-Embedding Predictive Architecture"**. 픽셀 복원 대신 **마스킹된 부분의 "표현"을 표현 공간에서 예측**한다. 자명해(모든 입력이 같은 표현으로 붕괴)는 EMA 타깃 인코더 + stop-gradient로 방지.
-- 왜: 세상엔 원리적으로 예측 불가능한 픽셀이 많다 — 그걸 맞추라고 강요하는 대신 **예측 가능한 구조(물체·운동·기하)만 표현에 남긴다**. 검증: 같은 조건에서 픽셀 예측(VideoMAE) 대비 SSv2 69.5 vs 65.5 + 학습 2배 빠름.
-- **[V-JEPA 2](vjepa2.md)(2025)**: 인터넷 영상 100만 시간+로 사전학습. **2-AC = Action-Conditioned** — 라벨 없는 로봇 영상 62시간 미만(Droid)으로 "행동 → 다음 표현" 예측기를 얹고, **목표 이미지의 표현과의 거리를 최소화하는 MPC**로 계획 → 처음 보는 두 실험실의 Franka에서 제로샷 픽앤플레이스. **보상 설계 없이 목표 사진 한 장으로 조작을 계획**한다는 것이 실용 포인트.
+**JEPA = Joint-Embedding Predictive Architecture**(르쿤 구상). 계보: I-JEPA(이미지) → [V-JEPA](vjepa.md)(영상, 2024) → [V-JEPA 2](vjepa2.md)(스케일+로봇, 2025, arXiv 2506.09985).
+
+**원칙**: 픽셀 복원 대신 **마스킹된 부분의 "표현"을 표현 공간에서 예측**한다. 영상의 ~90%를 시공간 블록으로 가리고, 보이는 부분의 표현에서 가려진 부분의 표현을 맞힌다:
+
+$$\mathcal{L}(\theta,\phi)=\big\|P_\phi(E_\theta(x),\Delta)-\operatorname{sg}(E_{\bar\theta}(y))\big\|_1$$
+
+여기서 타깃 인코더 $E_{\bar\theta}$는 **EMA**(지수이동평균)로 천천히 따라오고 **stop-gradient**가 걸린다 — 모든 입력을 같은 표현으로 보내버리는 자명해(붕괴)를 막는 장치다. 왜 표현 예측인가: 세상엔 원리적으로 예측 불가능한 픽셀(나뭇잎 흔들림·조명 노이즈)이 많고, 그걸 맞추라고 강요하면 용량이 낭비된다. 같은 조건 비교에서 픽셀 예측(VideoMAE) 대비 SSv2 69.5 vs 65.5 + 학습 2배 빠름으로 검증했다.
+
+**V-JEPA 2의 3단 구조 — 비싼 데이터를 싼 데이터가 흡수한다:**
+
+1. **action-free 사전학습**: 인터넷 영상+이미지 **100만 시간+**로 표현·예측기 학습(행동도 보상도 없음). 결과: SSv2 77.3(top-1), Epic-Kitchens action anticipation SOTA, LLM 정렬 시 영상 QA 84.0.
+2. **V-JEPA 2-AC**: 사전학습 인코더를 **고정**하고, 그 표현 위에 행동 조건 예측기 $\hat s_{t+1}=W_\phi(s_t,a_t)$를 얹는다 — 학습 데이터는 Droid의 **라벨 없는 로봇 영상 62시간 미만**(성공/실패 주석도 보상도 없이 영상+행동 시퀀스만).
+3. **목표 이미지 MPC**: 태스크를 목표 사진 한 장으로 주고, $a^\ast_{1:H}=\arg\min_a\|\hat s_{t+H}(a)-E(o_{goal})\|$ — 보상 함수 자리에 **목표 표현과의 거리**가 들어간 receding-horizon MPC.
+
+**결과의 의미**: 처음 보는 두 실험실의 Franka 팔에서 **zero-shot 픽앤플레이스** — 그 로봇·그 환경에서 아무 데이터도 안 모으고 목표 사진만으로 동작했다. 보상 설계와 대상 로봇 데이터 수집이라는 로봇 학습의 두 전제를 모두 우회한 첫 완주라서 "실로봇 최전선"이라 부른다.
+
+**약점**: 표현이 기하적으로 얼마나 정확한지 보증이 없다 — 정밀 6-DoF·접촉 풍부 조작에서 표현 거리만으로 충분한지는 열린 문제고, 계획이 표현공간에서 돌아 실패 원인을 픽셀로 짚기 어렵다(디버깅은 explicit 파이프라인이 앞선다). 상세 리뷰: [V-JEPA](vjepa.md) · [V-JEPA 2](vjepa2.md).
 
 ### ④ 비디오 생성계 — 관측을 직접 그린다
 
-- **[DIAMOND](diamond.md) = "DIffusion As a Model Of eNvironment Dreams"**(2024): 다음 프레임을 디퓨전으로 직접 생성하는 월드모델 안에서 RL 학습 — Atari100k mean 1.46로 월드모델-only 신기록. 논지: "이산 잠재 압축이 지운 작은 물체(공·총알)가 정책 성능을 깎는다" — **화질이 곧 제어 성능**임을 정량 입증한 유일한 사례.
-- **[Cosmos](cosmos.md)**(NVIDIA, 2025): 2,000만 시간 → 10⁸ 클립으로 사전학습한 월드 파운데이션 모델(확산 7/14B + 자기회귀 4~13B, 오픈웨이트) — 제어기가 아니라 **로봇·주행용 데이터/시뮬 공급자** 포지션. 참고 데모: [GameNGen](gamengen.md) — DOOM 게임엔진을 신경망으로 20FPS 통째 재현.
-- 계열 공통 약점: 장기 물리 일관성·추론 비용 — 그래서 로봇에서는 "제어기"보다 **데이터 생성** 용도가 먼저 자리 잡았다.
+**[DIAMOND](diamond.md) = "DIffusion As a Model Of eNvironment Dreams"**(NeurIPS 2024 Spotlight, arXiv 2405.12399). 출발 문제의식: Dreamer류의 32×32 잠재 압축에서 **화면에 작지만 게임엔 결정적인 것들**(공·총알·적)은 재구성 손실 관점에선 몇 픽셀이라 뭉개져도 손실이 거의 안 는다 — 그런데 정책 입장에선 그 몇 픽셀이 전부다. 공이 안 보이는 상상 속에서 배운 정책이 진짜 공을 칠 리 없다.
+
+- **기술 승부처 — 왜 DDPM이 아니라 EDM인가**: 확산 world model을 상상 rollout에 쓰려면 노이즈 제거를 1~3스텝으로 끝내야 한다. DDPM(노이즈 예측)은 노이즈가 신호를 압도하는 구간에서 항등함수에 가까운 예측을 배워 적은 스텝에서 rollout이 무너진다. EDM은 노이즈 수준에 따라 혼합 계수를 조절해 노이즈가 클 땐 **깨끗한 이미지 자체를 예측**하도록 파라미터화 → 1스텝으로도 장기 rollout이 안정.
+- **결정론 vs 다봉 ablation**: 거의 결정론적인 Breakout은 n=1로 충분하지만, 부분관측이라 미래가 다봉인 Boxing은 n=1이면 가능한 미래들의 **평균으로 붕괴한 흐릿한 프레임**이 나온다 — n=3이면 하나의 모드로 수렴. 전 실험은 절충으로 n=3.
+- **에이전트는 의도적으로 표준**: Dreamer 3단 루프에서 생성기만 RSSM→확산으로 교체(보상·종료는 별도 LSTM 네트워크, 정책은 REINFORCE+λ-return, H=15) — 그래서 "화질→성능"의 인과가 깨끗하게 측정된다.
+- **결과**: Atari 100k mean HNS **1.46**(STORM 1.266, DreamerV3 1.097 대비) — world-model-only 신기록, 26게임 중 11게임 초인간. 특히 작은 물체가 승부를 가르는 게임에서 이득이 크다. 비용은 게임당 RTX 4090 약 2.9일.
+
+**[Cosmos](cosmos.md)**(NVIDIA, 2025): 2,000만 시간 → 10⁸ 클립으로 사전학습한 **월드 파운데이션 모델**(확산 7/14B + 자기회귀 4~13B, 오픈웨이트). 제어기가 아니라 로봇·주행 하류를 위한 **데이터·시뮬 공급자** 포지션 — 하류가 RL이든 모방이든 원료를 댄다. 참고 데모: [GameNGen](gamengen.md) — DOOM 게임엔진을 신경망으로 20FPS 통째 재현(4-step DDIM).
+
+**계열 공통 약점**: 명시적 상태가 없는 픽셀 자기회귀의 본질적 표류(장기 물리·기하 일관성)와 생성 비용 — 그래서 로봇에서는 "제어기"보다 데이터 생성 용도가 먼저 자리 잡았다. 기하 일관성 보강(depth·registration·multi-view geometry)은 3D 쪽이 기여할 수 있는 열린 문제다.
 
 ## 3. 관통 비교 — 축 3개
 
