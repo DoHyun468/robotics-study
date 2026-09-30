@@ -1,6 +1,6 @@
 # WISE: World-model-guided Imagination Scheduling for Efficient Post-training of Vision-Language-Action Models
 
-아카이브 #2 · 2026-09-07 · arXiv 2609.03681v1 · Chenhao Zhang, Hanyu Zhao, Hang Cheng, Tengfei Pan, Long Zeng · 선정 이유: 아카이브 #1(π0)의 정확히 다음 단계 질문 — "사전학습된 VLA를 실물 로봇을 굴리지 않고 어떻게 더 좋게 만드나". 월드모델(TD-MPC2 경험)과 VLA 파인튜닝(OpenVLA LoRA 경험)을 한 프레임에 묶는 논문이라 면접에서 두 개인 프로젝트를 한 답변으로 연결할 수 있다.
+아카이브 #2 · 2026-09-07 · arXiv 2609.03681v1 · Chenhao Zhang, Hanyu Zhao, Hang Cheng, Tengfei Pan, Long Zeng · 선정 이유: 아카이브 #1(π0)의 정확히 다음 단계 질문 — "사전학습된 VLA를 실물 로봇을 굴리지 않고 어떻게 더 좋게 만드나". 월드모델(TD-MPC2 경험)과 VLA 파인튜닝(OpenVLA LoRA 경험)을 한 프레임에 묶는 논문이라 두 개인 프로젝트를 하나의 구조로 연결할 수 있다.
 
 ---
 
@@ -61,7 +61,7 @@
     L_WM = E ‖ v_ψ([z̃_obs ; z_fut,λ], λ, ℓ, a)_fut − (z_fut − ε) ‖²₂
 
 - `z̃_obs`는 섭동된 관측 잠재로, **조건 컨텍스트로만** 들어간다. rectified flow 지도는 **미래 잠재에만** 걸린다.
-- **아카이브 #1과의 연결점**: π0가 액션 공간에서 쓴 flow matching과 정확히 같은 수학이 여기서는 비디오 VAE 잠재 공간에 쓰인다. `A^τ = τA + (1−τ)ε`, 타깃 `A − ε` ↔ `z_λ = λz + (1−λ)ε`, 타깃 `z − ε`. **면접에서 "flow matching이 뭐냐"는 질문에 액션 생성과 미래 예측 두 자리를 한 번에 답할 수 있다.**
+- **아카이브 #1과의 연결점**: π0가 액션 공간에서 쓴 flow matching과 정확히 같은 수학이 여기서는 비디오 VAE 잠재 공간에 쓰인다. `A^τ = τA + (1−τ)ε`, 타깃 `A − ε` ↔ `z_λ = λz + (1−λ)ε`, 타깃 `z − ε`. **"flow matching이 뭐냐"를 액션 생성과 미래 예측 두 자리에서 한 번에 설명할 수 있다.**
 
 ### 3.3 유한 반사실 상상 (Bounded Counterfactual Imagination)
 
@@ -252,7 +252,7 @@ L개 청크를 반복하면
 5. **하이퍼파라미터 공개가 불완전하다.** M(후보 수), H(예측 프레임), L(청크 수), κ(스케줄 임계값)의 구체 수치가 HTML판 본문·부록에 없다. 재현 시 직접 탐색해야 한다.
 6. **월드모델이 픽셀 공간이다.** 명시적 3D 표현이나 접촉 물리가 없다. Fig 5의 실패가 대부분 **상호작용 기하**(높이 변화, 상대 위치, 핸들 위치) 문제라는 점은 이 선택의 대가를 보여준다.
 
-## 7. 김도현 연결 — 면접용 한 마디
+## 7. 내 작업과의 연결
 
 **① TD-MPC2 대비 "상상을 언제 쓰는가"의 축**
 

@@ -97,7 +97,7 @@ global positioning 결과는 강건하지만 intrinsics 미상이면 정확도�
 
 둘째 **실패 모드의 교체**: incremental의 실패(시드 실패, 순차 등록 중 drift·모델 분열)는 사라지는 대신, rotation averaging 실패(회전 대칭 구조 — *exhibition_hall* 사례가 정확히 대칭 제품 캡처 실패와 같은 유형)와 잘못 병합된 재구성(camera clustering이 커버)이 새 관리 대상이 된다. 운영 관점에서는 "어느 단계에서 죽었나"의 진단 지점이 등록 루프 로그에서 averaging/positioning 수렴 로그로 바뀌는 셈이고, 실패 케이스 관리 체계를 그대로 옮길 수 없다는 뜻이다. 매칭이 무너지는 저텍스처·반복 패턴 실패는 앞단이 COLMAP 그대로라 동일하게 남는다.
 
-셋째, global positioning의 유계 각도 오차 + 무작위 초기화 수렴이라는 성질은 석사 때의 기하(다중 뷰 제약, 삼각측량 퇴화 조건) 감각과 직결되고, robotics 쪽으로는 이 구조가 pose graph optimization/SLAM 백엔드와 같은 언어(회전-병진 분리, robust kernel, gauge freedom)다. 특히 "콜리니어 forward motion에서 translation averaging이 퇴화한다"는 분석은 자율주행·모바일 로봇 시퀀스가 바로 그 케이스라, robot perception 면접에서 COLMAP 리뷰와 짝지어 incremental vs global의 트레이드오프를 실무+이론 양쪽에서 설명하는 축으로 쓸 수 있다.
+셋째, global positioning의 유계 각도 오차 + 무작위 초기화 수렴이라는 성질은 석사 때의 기하(다중 뷰 제약, 삼각측량 퇴화 조건) 감각과 직결되고, robotics 쪽으로는 이 구조가 pose graph optimization/SLAM 백엔드와 같은 언어(회전-병진 분리, robust kernel, gauge freedom)다. 특히 "콜리니어 forward motion에서 translation averaging이 퇴화한다"는 분석은 자율주행·모바일 로봇 시퀀스가 바로 그 케이스라, robot perception 관점에서 COLMAP 리뷰와 짝지어 incremental vs global의 트레이드오프를 실무+이론 양쪽에서 설명하는 축으로 쓸 수 있다.
 
 ## 한 줄 평 / 한계
 

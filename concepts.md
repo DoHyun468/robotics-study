@@ -1,6 +1,6 @@
 # Concepts — RL · World Models
 
-이 프로젝트의 데모는 대부분 **모방(시연→action)** 또는 **고전 기하 파이프라인**이다. 그 반대편 축 — **보상으로 스스로 배우는 model-based RL**과 **world model** — 을 개념적으로 정리한다. "OpenVLA 같은 VLA와 Dreamer/MuZero는 뭐가 다른가", "world model은 지금 어디까지 왔나", "전직을 위해 RL을 따로 파야 하나"라는 질문에 답하는 페이지.
+이 프로젝트의 데모는 대부분 **모방(시연→action)** 또는 **고전 기하 파이프라인**이다. 그 반대편 축 — **보상으로 스스로 배우는 model-based RL**과 **world model** — 을 개념적으로 정리한다. "OpenVLA 같은 VLA와 Dreamer/MuZero는 뭐가 다른가", "world model은 지금 어디까지 왔나", "RL을 따로 파야 하나"라는 질문에 답하는 페이지.
 
 ## 1. Model-based RL / World Model 계열
 
@@ -55,6 +55,6 @@ OpenVLA와 Dreamer를 "누가 더 세냐"로 붙이기 어렵다. **다른 문�
 
 - **RL은 언어 수준만** — MDP, policy/value, model-free vs model-based, BC vs RL의 차이를 개념으로 이해하면 충분. 풀스택 RL(보상 설계·안정화·대규모 튜닝)은 타깃 포지션(perception / spatial AI / VLA)에 **미스핏**이라 투자 대비 효율이 낮다.
 - **world model은 예측형**(JEPA)을 3D/재구성 강점 위에 얹고, 생성형은 sim/데이터 생성 관점으로 훑는다.
-- 무엇보다 **perception → action 데모를 계속 출하**하는 것(이 사이트의 [perception](perception.md)·[manipulation](manipulation.md)·[grasp A/B](grasp_sota.md)·[VLA 재현](vla.md))이 전직 최단거리. 개념 정리는 그 데모를 설명하는 언어로만 쓰면 된다.
+- 무엇보다 **perception → action 데모를 계속 출하**하는 것(이 사이트의 [perception](perception.md)·[manipulation](manipulation.md)·[grasp A/B](grasp_sota.md)·[VLA 재현](vla.md))이 최단거리. 개념 정리는 그 데모를 설명하는 언어로만 쓰면 된다.
 
 *이 페이지는 논문/개념의 정성적 정리이며, 이 프로젝트에서 직접 학습·측정한 수치가 아니다(측정값은 다른 페이지 참조).*
