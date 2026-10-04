@@ -12,7 +12,7 @@
 
 무한 지평 MDP `(S, A, T, R, γ)`에서 기대 감가 return을 최대화하는 정책 π를 찾는다. TD-MPC 계열은 정책을 명시적으로 학습하는 대신, **학습된 월드모델로 매 스텝 궤적 최적화(계획)를 수행해** 행동을 고른다. MPC의 기본 문제는
 
-    π(s_t) = argmax_{a_{t:t+H}}  E[ Σ_{i=0}^{H} γ^{t+i} R(s_{t+i}, a_{t+i}) ]        (1)
+$$\pi(s_t) = \arg\max_{a_{t:t+H}}\; \mathbb{E}\Big[ \sum_{i=0}^{H} \gamma^{t+i}\, R(s_{t+i}, a_{t+i}) \Big] \tag{1}$$
 
 인데, 지평 H가 유한하므로 이 해는 **시간적으로 국소 최적**일 뿐이다. TD-MPC2는 지평 끝에 학습된 terminal value를 붙여 이 한계를 보정한다(§3.3의 식 6).
 
@@ -29,11 +29,13 @@ TD-MPC2의 기여는 새로운 이론이 아니라, 이 두 문제를 정면으�
 
 관측 s, 행동 a, 잠재 z, 학습 가능한 태스크 임베딩 e에 대해:
 
-    Encoder        z  = h(s, e)         관측 → 잠재
-    Latent dynamics z' = d(z, a, e)     잠재 공간 forward dynamics
-    Reward         r̂  = R(z, a, e)     트랜지션의 보상 예측
-    Terminal value q̂  = Q(z, a, e)     감가 return 예측
-    Policy prior   â  = p(z, e)         Q를 최대화하는 행동 예측     (2)
+$$\begin{aligned}
+&\text{Encoder:} && z = h(s, e) && \text{관측} \rightarrow \text{잠재} \\
+&\text{Latent dynamics:} && z' = d(z, a, e) && \text{잠재 공간 forward dynamics} \\
+&\text{Reward:} && \hat{r} = R(z, a, e) && \text{트랜지션의 보상 예측} \\
+&\text{Terminal value:} && \hat{q} = Q(z, a, e) && \text{감가 return 예측} \\
+&\text{Policy prior:} && \hat{a} = p(z, e) && Q\text{를 최대화하는 행동 예측}
+\end{aligned} \tag{2}$$
 
 핵심 설계 철학: **관측을 복원(decode)하지 않는다.** 픽셀·고차원 상태의 장기 예측은 어렵고 제어에 꼭 필요하지도 않으므로, "행동 시퀀스가 주어졌을 때 결과(보상·가치)를 정확히 맞히는" 최소한의 모델만 학습한다. 이것이 implicit world model이며, 저자들은 이 절제가 **적당한 모델 크기로 대규모 데이터를 소화하는 열쇠**라고 주장한다. 정책 prior p는 planner의 샘플링을 유도하고 TD 학습 비용을 줄이는 보조 역할이다.
 
@@ -41,7 +43,7 @@ TD-MPC2의 기여는 새로운 이론이 아니라, 이 두 문제를 정면으�
 
 리플레이 버퍼 B에서 길이 H 구간 (s, a, r, s')_{0:H}를 샘플링해, h·d·R·Q를 공동 최적화한다.
 
-    L(θ) = E[ Σ_{t=0}^{H} λ^t ( ‖z'_t − sg(h(s'_t))‖²₂  +  CE(r̂_t, r_t)  +  CE(q̂_t, q_t) ) ]        (3)
+$$\mathcal{L}(\theta) = \mathbb{E}\Big[ \sum_{t=0}^{H} \lambda^t \big( \|z'_t - \mathrm{sg}(h(s'_t))\|_2^2 \,+\, \mathrm{CE}(\hat{r}_t, r_t) \,+\, \mathrm{CE}(\hat{q}_t, q_t) \big) \Big] \tag{3}$$
 
 각 항을 뜯으면:
 
@@ -54,7 +56,7 @@ TD-MPC2의 기여는 새로운 이론이 아니라, 이 두 문제를 정면으�
 
 ### 3.3 정책 prior — 최대 엔트로피 SAC 스타일
 
-    L_p(θ) = E[ Σ_{t=0}^{H} λ^t ( α Q(z_t, p(z_t)) − β H(p(·|z_t)) ) ],   z_{t+1} = d(z_t, a_t),  z_0 = h(s_0)        (4)
+$$\mathcal{L}_p(\theta) = \mathbb{E}\Big[ \sum_{t=0}^{H} \lambda^t \big( \alpha\, Q(z_t, p(z_t)) - \beta\, \mathcal{H}(p(\cdot \mid z_t)) \big) \Big], \quad z_{t+1} = d(z_t, a_t),\ z_0 = h(s_0) \tag{4}$$
 
 gradient는 p에만 흐른다. Q의 크기와 엔트로피 H의 크기가 태스크·학습 단계마다 크게 다르므로 α를 이동 통계(5%–95% 백분위)로 자동 조정한다. 전작의 "가우시안 노이즈 스케줄을 손으로 튜닝한 결정적 정책"을 태스크 불문 하이퍼파라미터로 대체한 것이다.
 
@@ -62,7 +64,7 @@ gradient는 p에만 흐른다. Q의 크기와 엔트로피 H의 크기가 태스
 
 잠재 z를 L개 그룹으로 나누고 각 그룹(차원 V=8)에 softmax를 적용한다.
 
-    z° = [g_1, …, g_L],   g_i = exp(z_{i:i+V}/τ) / Σ_{j=1}^{V} exp(z_j/τ)        (5)
+$$z^{\circ} = [\, g_1, \dots, g_L \,], \qquad g_i = \frac{\exp(z_{i:i+V}/\tau)}{\sum_{j=1}^{V} \exp(z_j/\tau)} \tag{5}$$
 
 각 그룹의 합이 1이 되므로 전체 z의 ℓ₂-norm이 작게 유지되고, softmax의 성질상 표현이 자연스럽게 **희소한 쪽으로 편향**된다. 해석: VQ-VAE의 "one-hot 코드 벡터 묶음"의 연속 완화판이다. τ→∞면 정확히 one-hot(이산 코드), τ=0이면 균등 분포(정보 소멸). 기본값 τ=1로 그 사이의 부드러운 지점을 쓴다. 절제 실험에서 SimNorm 제거 시 학습이 불안정해지는 것이 확인됐다 — **gradient 폭발로 발산하던 TD-MPC의 병을 고친 핵심 부품**. 여기에 Q 앙상블 5개(1% dropout, TD 타깃은 무작위 2개의 min)로 가치 과대추정을 눌렀다.
 
@@ -70,7 +72,7 @@ gradient는 p에만 흐른다. Q의 크기와 엔트로피 H의 크기가 태스
 
 행동 선택은 매 스텝 MPPI(derivative-free 샘플링 최적화)로 한다. 시간 종속 대각 가우시안 N(μ, σ²), μ,σ ∈ R^{H×m}의 파라미터를 다음을 최대화하도록 반복 갱신한다.
 
-    μ*, σ* = argmax E_{a_{t:t+H} ~ N(μ,σ²)} [ γ^H Q(z_{t+H}, a_{t+H}) + Σ_{h=t}^{H−1} γ^h R(z_h, a_h) ]        (6)
+$$\mu^*, \sigma^* = \arg\max\; \mathbb{E}_{a_{t:t+H} \sim \mathcal{N}(\mu, \sigma^2)} \Big[ \gamma^H Q(z_{t+H}, a_{t+H}) + \sum_{h=t}^{H-1} \gamma^h R(z_h, a_h) \Big] \tag{6}$$
 
 절차: 후보 행동 시퀀스 512개를 샘플링(그중 24개는 정책 prior p의 rollout에서) → 잠재 공간에서 d로 굴려 보상 합 + 지평 끝 가치로 평가 → 상위 64개(elite)의 가중 평균으로 μ, σ 갱신 → 6회 반복(행동 차원 ≥ 20이면 +2회) → 첫 행동 a_t ~ N(μ*_t, σ*_t)만 실행. 이전 스텝의 해를 1칸 시프트해 warm-start한다.
 
@@ -135,7 +137,7 @@ gradient는 p에만 흐른다. Q의 크기와 엔트로피 H의 크기가 태스
 ## 7. 내 작업과의 연결
 
 - **"TD-MPC2는 논문으로만 아는 게 아니라 직접 열어봤다"**: 공식 5M cheetah-run 체크포인트를 로드해 return 863±12(5에피소드, 논문급)를 재현하고, 에이전트 내부의 잠재 월드모델을 open-loop으로 30스텝 굴려 latent MSE 2.9×10⁻⁵(h1) → 2.7×10⁻⁴(h10) → 6.7×10⁻³(h30), 보상 예측 오차 0.006 → 0.12를 계측했다(robotics-lab/outputs/wm_tdmpc2/). **이 drift 곡선이 바로 이 논문이 H=3이라는 짧은 계획 지평 + terminal value 부트스트랩을 택한 이유의 실측 증거다** — h≤3에서는 잠재 오차가 10⁻⁵~10⁻⁴ 수준이라 계획이 신뢰 가능하고, 그 너머는 Q에 맡기는 구조.
-- **"implicit world model은 feed-forward 복원과 같은 절제의 철학"**: 리콘랩스에서 per-scene 최적화 대신 feed-forward 3D 복원으로 제품화했듯, TD-MPC2도 픽셀 재구성을 버리고 제어에 필요한 예측(보상·가치)만 남겼다. "무엇을 안 만들지"로 스케일을 얻는 설계를 양쪽에서 봤다고 말할 수 있다.
+- **"implicit world model은 feed-forward 복원과 같은 절제의 철학"**: 실무에서 per-scene 최적화 대신 feed-forward 3D 복원을 서비스에 통합했듯, TD-MPC2도 픽셀 재구성을 버리고 제어에 필요한 예측(보상·가치)만 남겼다. "무엇을 안 만들지"로 스케일을 얻는 설계를 양쪽에서 봤다고 말할 수 있다.
 - **"조작 결과를 읽을 줄 안다"**: Figure 6에서 DreamerV3가 lift/pick/stack 같은 정밀 파지에서 무너지고 TD-MPC2가 앞서는 것은, 빈피킹 개인 프로젝트에서 본 "접촉 순간의 정밀도가 병목"이라는 경험과 정확히 겹친다. 월드모델 계열을 조작에 쓸 때 무엇을 봐야 하는지(성공률 곡선의 도메인별 분해)를 안다.
 - 아카이브 연결: #2 WISE가 월드모델 상상을 VLA 사후학습에 붙일 때 전제한 "짧은 rollout만 신뢰 가능"이라는 원칙은, 이 논문의 λ^t 감쇠·H=3 설계 및 내 drift 실측과 같은 이야기다. 다음 큐인 DreamerV3는 같은 문제를 "재구성 있는 생성 모델 + 상상 학습"으로 푸는 대조군으로 읽는다.
 

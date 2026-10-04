@@ -28,15 +28,15 @@
 
 실제 상호작용 컨텍스트를 `h_t = (O_t, s_t, ℓ)` — 최근 다중 시점 관측, 로봇 상태, 언어 지시 — 로 두고, 정책은 액션 청크를 낸다.
 
-    a_t ~ π_θ(· | h_t)
+$$a_t \sim \pi_\theta(\,\cdot \mid h_t)$$
 
 목표는 태스크 성공의 기댓값 최대화다.
 
-    θ* = argmax_θ  E_{ℓ~p(ℓ), τ~p(τ|π_θ, ℓ)} [ y(τ, ℓ) ],   y ∈ {0, 1}
+$$\theta^* = \arg\max_\theta\; \mathbb{E}_{\ell \sim p(\ell),\, \tau \sim p(\tau \mid \pi_\theta, \ell)} \big[\, y(\tau, \ell) \,\big], \qquad y \in \{0, 1\}$$
 
 `y`는 궤적 τ가 지시 ℓ을 성공적으로 완수했는지의 이진 지시자다. 이 목적함수를 실물에서 직접 최적화하는 것이 비싼 이유는 **피드백이 희소하고(성공/실패 한 비트) 탐색이 위험**해서다. 그래서 월드모델 `p_ψ`로 반사실적(counterfactual) 결과를 예측한다.
 
-    Ô_{t+1:t+H} ~ p_ψ(· | O_t, ℓ, a_t)
+$$\hat{O}_{t+1:t+H} \sim p_\psi(\,\cdot \mid O_t, \ell, a_t)$$
 
 즉 "이 액션 청크를 실행하면 앞으로 H 프레임 동안 뭐가 보일지"를 액션 조건부로 생성한다.
 
@@ -46,19 +46,19 @@
 
 **① 선형 보간 경로**
 
-    z_fut,λ = (1 − λ)·ε + λ·z_fut
+$$z_{\text{fut},\lambda} = (1-\lambda)\,\epsilon + \lambda\, z_{\text{fut}}$$
 
 - λ=0이면 순수 노이즈, λ=1이면 실제 미래 잠재. 노이즈와 데이터를 잇는 직선이다.
 
 **② 타깃 속도**
 
-    d/dλ [ z_fut,λ ] = z_fut − ε
+$$\frac{d}{d\lambda}\, z_{\text{fut},\lambda} = z_{\text{fut}} - \epsilon$$
 
 - 직선 경로를 미분하면 속도는 상수 `z_fut − ε`. 이게 회귀 타깃이다.
 
 **③ 손실**
 
-    L_WM = E ‖ v_ψ([z̃_obs ; z_fut,λ], λ, ℓ, a)_fut − (z_fut − ε) ‖²₂
+$$\mathcal{L}_{\text{WM}} = \mathbb{E}\, \big\| v_\psi([\tilde{z}_{\text{obs}}\,;\, z_{\text{fut},\lambda}],\, \lambda, \ell, a)_{\text{fut}} - (z_{\text{fut}} - \epsilon) \big\|_2^2$$
 
 - `z̃_obs`는 섭동된 관측 잠재로, **조건 컨텍스트로만** 들어간다. rectified flow 지도는 **미래 잠재에만** 걸린다.
 - **아카이브 #1과의 연결점**: π0가 액션 공간에서 쓴 flow matching과 정확히 같은 수학이 여기서는 비디오 VAE 잠재 공간에 쓰인다. `A^τ = τA + (1−τ)ε`, 타깃 `A − ε` ↔ `z_λ = λz + (1−λ)ε`, 타깃 `z − ε`. **"flow matching이 뭐냐"를 액션 생성과 미래 예측 두 자리에서 한 번에 설명할 수 있다.**
@@ -67,19 +67,21 @@
 
 스케줄러가 고른 컨텍스트에서 정책이 후보 액션 청크 M개를 샘플링한다.
 
-    a_{t,i} ~ π_θ(· | O_t, s_t, ℓ),   i = 1, ..., M
+$$a_{t,i} \sim \pi_\theta(\,\cdot \mid O_t, s_t, \ell), \qquad i = 1, \dots, M$$
 
 각 후보마다 **닫힌 루프 상상**을 돌린다. 초기값 `Ô_i^(0) = O_t`, `ŝ_i^(0) = s_t`, `â_i^(0) = a_{t,i}`에서 시작해 재귀적으로
 
-    Ô_i^(r+1) ~ p_ψ(· | Ô_i^(r), ℓ, â_i^(r))          … 월드모델이 다음 관측 생성
-    ŝ_i^(r+1) = F_s(ŝ_i^(r), â_i^(r))                  … 고유수용 상태는 결정론적으로 갱신
-    â_i^(r+1) ~ π_θ(· | Ô_i^(r+1), ŝ_i^(r+1), ℓ)       … r < L−1 일 때, 정책이 상상 관측 위에서 다음 액션
+$$\begin{aligned}
+\hat{O}_i^{(r+1)} &\sim p_\psi(\,\cdot \mid \hat{O}_i^{(r)}, \ell, \hat{a}_i^{(r)}) && \text{월드모델이 다음 관측 생성} \\
+\hat{s}_i^{(r+1)} &= F_s(\hat{s}_i^{(r)}, \hat{a}_i^{(r)}) && \text{고유수용 상태는 결정론적으로 갱신} \\
+\hat{a}_i^{(r+1)} &\sim \pi_\theta(\,\cdot \mid \hat{O}_i^{(r+1)}, \hat{s}_i^{(r+1)}, \ell) && r < L-1\ \text{일 때, 정책이 상상 관측 위에서 다음 액션}
+\end{aligned}$$
 
 `F_s`는 액션 청크로부터 proprioception을 결정론적으로 업데이트하는 함수다. **월드모델은 픽셀만 만들고 상태는 운동학적으로 굴린다** — 비디오 예측 모델이 관절각까지 환각하지 않게 막는 실무적 분리다.
 
 L개 청크를 반복하면
 
-    τ̂_i = { Ô_i^(1:L), â_i^(0:L−1) }
+$$\hat{\tau}_i = \big\{\, \hat{O}_i^{(1:L)},\; \hat{a}_i^{(0:L-1)} \,\big\}$$
 
 청크당 H 프레임이므로 총 `L·H` 프레임, 인덱스 `j = 1, ..., LH`. **L을 유한하게 묶는 것 자체가 오차 누적 방지 장치**다. (논문 HTML판에 M, H, L, κ의 구체 수치는 명시되지 않았다.)
 
@@ -87,14 +89,16 @@ L개 청크를 반복하면
 
 동기화된 손목/3인칭 관측 `O_t = {I_t^w, I_t^a}`를 view-shared DINOv2 ViT-L/14 인코더 `E_φs`로 인코딩하고, 경량 헤드 `g_η`가 상호작용 관련도 점수를 낸다.
 
-    s_t = σ( g_η [ E_φs(I_t^w) ; E_φs(I_t^a) ] ),   s_t ∈ [0, 1]
-    m_t = 𝟙[ s_t > κ ]
+$$\begin{aligned}
+s_t &= \sigma\big(\, g_\eta [\, E_{\varphi_s}(I_t^w)\,;\, E_{\varphi_s}(I_t^a) \,] \,\big), \qquad s_t \in [0, 1] \\
+m_t &= \mathbb{1}[\, s_t > \kappa \,]
+\end{aligned}$$
 
 `m_t = 1`인 컨텍스트에서만 후보 생성 + 월드모델 롤아웃을 돌리고, 아니면 건너뛴다.
 
 **약지도(weak supervision)가 이 논문의 실용적 핵심이다.** 라벨은 사람이 태스크 단계를 주석하지 않는다. 오프라인 궤적의 **그리퍼/파지 상태**에서 자동 유도한다 — 파지 또는 능동 조작 상태면 `y_n = 1`, 나머지는 `y_n = 0`. 클래스 불균형은 가중치로 보정한다.
 
-    L_sched = −(1/N) Σ_n w_n [ y_n log s_n + (1 − y_n) log(1 − s_n) ]
+$$\mathcal{L}_{\text{sched}} = -\frac{1}{N} \sum_n w_n \big[\, y_n \log s_n + (1 - y_n) \log(1 - s_n) \,\big]$$
 
 헤드 아키텍처는 256차원 은닉층 2개 MLP + LayerNorm + GELU + dropout 0.1. 학습 시엔 분류 헤드와 `E_φs`의 **마지막 트랜스포머 블록만** 열고 나머지는 동결한다. 사후학습 중에는 스케줄러 전체가 동결되며, **추론 시엔 그리퍼 신호 없이 시각 관측만으로** 상호작용 관련도를 판단한다.
 
@@ -102,22 +106,26 @@ L개 청크를 반복하면
 
 별도로 학습한 DINOv2 인코더 `E_φr`로 상상된 다중 시점 프레임을 임베딩하고
 
-    e_{i,j} = [ E_φr(Î_{i,j}^w) ; E_φr(Î_{i,j}^a) ]
+$$e_{i,j} = [\, E_{\varphi_r}(\hat{I}_{i,j}^w)\,;\, E_{\varphi_r}(\hat{I}_{i,j}^a) \,]$$
 
 세 개 헤드로 **진척도·신뢰도·완료도**를 예측한다.
 
-    p_{i,j} = σ(h_p(e_{i,j}))     … 진척도 (progress)
-    c_{i,j} = σ(h_c(e_{i,j}))     … 신뢰도 (confidence)
-    q_{i,j} = tanh(h_q(e_{i,j}))  … 완료도 (completion)
+$$\begin{aligned}
+p_{i,j} &= \sigma(h_p(e_{i,j})) && \text{진척도 (progress)} \\
+c_{i,j} &= \sigma(h_c(e_{i,j})) && \text{신뢰도 (confidence)} \\
+q_{i,j} &= \tanh(h_q(e_{i,j})) && \text{완료도 (completion)}
+\end{aligned}$$
 
 실제 컨텍스트에서 평가한 `p_{i,0} = p_t`를 시작점으로 궤적 보상을 조립한다.
 
-    G_i = Σ_{j=1}^{LH}  c_{i,j} · [ p_{i,j} − p_{i,j−1} ]_0^δ     … 전진 진척(신뢰도 가중)
-    B_i = Σ_{j=1}^{LH}        [ p_{i,j−1} − p_{i,j} ]_0^δ         … 후퇴 페널티
-    T_i = max_j q_{i,j}                                            … 최고 완료도
-    R_i = G_i − α·B_i + β·T_i                                      … α=0.2, β=2.0, δ=0.2
+$$\begin{aligned}
+G_i &= \sum_{j=1}^{LH} c_{i,j} \cdot \big[\, p_{i,j} - p_{i,j-1} \,\big]_0^\delta && \text{전진 진척(신뢰도 가중)} \\
+B_i &= \sum_{j=1}^{LH} \big[\, p_{i,j-1} - p_{i,j} \,\big]_0^\delta && \text{후퇴 페널티} \\
+T_i &= \max_j\, q_{i,j} && \text{최고 완료도} \\
+R_i &= G_i - \alpha B_i + \beta T_i && \alpha{=}0.2,\ \beta{=}2.0,\ \delta{=}0.2
+\end{aligned}$$
 
-여기서 `[x]_0^δ = min(max(x, 0), δ)`는 0과 δ 사이로 자르는 클리핑이다.
+여기서 $[x]_0^\delta = \min(\max(x, 0), \delta)$는 0과 δ 사이로 자르는 클리핑이다.
 
 **세 가지 설계 포인트를 읽어야 한다.**
 - **δ 클리핑**: 한 프레임에서 진척도가 급등하면(=월드모델이 장면을 튀게 그렸으면) 그 이득을 δ=0.2로 잘라낸다. 환각 한 방으로 보상이 뛰는 것을 막는다.
@@ -126,15 +134,17 @@ L개 청크를 반복하면
 
 **신뢰할 수 없는 그룹은 버린다.** 각 후보를 두 번 상상해 `R̄_i = (R_i^(1) + R_i^(2))/2`를 쓰고, 그룹 전체를 다음 세 조건을 모두 만족할 때만 유지한다.
 
-    ΔR = max_i R̄_i − min_i R̄_i ≥ 0.02      … 후보 간 변별력이 있어야 함
-    ρ_rank ≥ 0.5                             … 두 번의 상상에서 순위가 일관되어야 함
-    σ_WM ≤ 0.2                               … 반복 상상 간 보상 변동이 작아야 함
+$$\begin{aligned}
+\Delta R &= \max_i \bar{R}_i - \min_i \bar{R}_i \ge 0.02 && \text{후보 간 변별력이 있어야 함} \\
+\rho_{\text{rank}} &\ge 0.5 && \text{두 번의 상상에서 순위가 일관되어야 함} \\
+\sigma_{\text{WM}} &\le 0.2 && \text{반복 상상 간 보상 변동이 작아야 함}
+\end{aligned}$$
 
 **정책 갱신은 그룹 상대(group-relative) 방식이다.**
 
-    A_i = ( R̄_i − μ_R̄ ) / max( σ_R̄, ε )
+$$A_i = \frac{\bar{R}_i - \mu_{\bar{R}}}{\max(\sigma_{\bar{R}},\, \varepsilon)}$$
 
-    g_WISE = (1/M) Σ_{i=1}^{M} sg(A_i) · ∇_θ L_FM(θ; a_{t,i}, h_t)  +  λ_ref · ∇_θ L_ref
+$$g_{\text{WISE}} = \frac{1}{M} \sum_{i=1}^{M} \mathrm{sg}(A_i) \cdot \nabla_\theta \mathcal{L}_{\text{FM}}(\theta;\, a_{t,i}, h_t) \;+\; \lambda_{\text{ref}} \cdot \nabla_\theta \mathcal{L}_{\text{ref}}$$
 
 정책은 `−g_WISE` 방향으로 갱신된다. (논문 HTML판은 `sg(·)`를 정의하지 않는다. 본문 서술은 "signed advantages define the update direction"이므로 부호 함수로 읽는 것이 자연스럽고, stop-gradient로 읽어도 정성적 거동은 같다.)
 
@@ -158,11 +168,11 @@ L개 청크를 반복하면
 
 보상 모델은 AdamW로 15 에폭, 예측 헤드와 `E_φr`의 **마지막 4개 트랜스포머 블록**만 열어 학습한다. 손실은
 
-    L_RM = L_rank + L_abs + 0.5·L_conf + L_comp + 0.1·L_aug
+$$\mathcal{L}_{\text{RM}} = \mathcal{L}_{\text{rank}} + \mathcal{L}_{\text{abs}} + 0.5\,\mathcal{L}_{\text{conf}} + \mathcal{L}_{\text{comp}} + 0.1\,\mathcal{L}_{\text{aug}}$$
 
 `L_rank`는 시간 순서 기반 랭킹 손실로, 성공 궤적에서 나중 상태가 더 높은 점수를 받도록 한다.
 
-    L_rank = softplus( m − (z_{t_l}^p − z_{t_e}^p) ),   t_e < t_l
+$$\mathcal{L}_{\text{rank}} = \mathrm{softplus}\big(\, m - (z_{t_l}^p - z_{t_e}^p) \,\big), \qquad t_e < t_l$$
 
 `z^p`는 시그모이드 이전 진척도 로짓, `m`은 마진이다. 여기에 실패 궤적의 시간 정렬된 상태를 하드 네거티브로 붙인다.
 
@@ -264,7 +274,7 @@ L개 청크를 반복하면
 
 **③ 3D 인식 배경에서 나오는 질문 — 왜 픽셀 월드모델인가**
 
-> "이 월드모델은 Open-Sora 기반이라 명시적 3D 표현이 없습니다. 그런데 실패 사례 그림을 보면 실점이 대부분 상호작용 기하 — 작업대 높이 변화, 물체 상대 위치, 핸들 위치 추정 — 에서 납니다. 저는 리콘랩스에서 3DGS와 VGGT로 실스케일 측정을 제품화하면서 스케일과 기하가 어긋날 때 뭐가 무너지는지를 봤습니다. 상상 롤아웃을 픽셀이 아니라 기하 정합된 표현 위에서 돌리면 이 실패 모드가 줄어들지 궁금하고, 그게 제가 기여할 수 있는 지점이라고 생각합니다."
+> "이 월드모델은 Open-Sora 기반이라 명시적 3D 표현이 없습니다. 그런데 실패 사례 그림을 보면 실점이 대부분 상호작용 기하 — 작업대 높이 변화, 물체 상대 위치, 핸들 위치 추정 — 에서 납니다. 저는 실무에서 3DGS와 VGGT 기반 복원으로 높이 비율 측정을 만들면서 스케일과 기하가 어긋날 때 뭐가 무너지는지를 봤습니다. 상상 롤아웃을 픽셀이 아니라 기하 정합된 표현 위에서 돌리면 이 실패 모드가 줄어들지 궁금하고, 그게 제가 기여할 수 있는 지점이라고 생각합니다."
 
 **④ 빈피킹·산업 셀 관점 — 스케줄러의 실용성**
 
