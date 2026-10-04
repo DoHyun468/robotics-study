@@ -91,7 +91,7 @@ $$\hat{\tau}_i = \big\{\, \hat{O}_i^{(1:L)},\; \hat{a}_i^{(0:L-1)} \,\big\}$$
 
 $$\begin{aligned}
 s_t &= \sigma\big(\, g_\eta [\, E_{\varphi_s}(I_t^w)\,;\, E_{\varphi_s}(I_t^a) \,] \,\big), \qquad s_t \in [0, 1] \\
-m_t &= \mathbb{1}[\, s_t > \kappa \,]
+m_t &= \mathbf{1}[\, s_t > \kappa \,]
 \end{aligned}$$
 
 `m_t = 1`인 컨텍스트에서만 후보 생성 + 월드모델 롤아웃을 돌리고, 아니면 건너뛴다.
