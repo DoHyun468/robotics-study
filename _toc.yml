@@ -33,6 +33,13 @@ parts:
     chapters:
       - file: hand_pose
       - file: human_pose
+  - caption: Digital Twin · Scan-to-Sim
+    chapters:
+      - file: digital-twin/index
+        sections:
+          - file: digital-twin/openusd
+          - file: digital-twin/articulation
+          - file: digital-twin/simready-mesh
   - caption: Concepts
     chapters:
       - file: concepts
