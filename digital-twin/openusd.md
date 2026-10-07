@@ -66,7 +66,22 @@ OpenUSD(Universal Scene Description)는 Pixar가 영화 제작 파이프라인�
 
 구조적 차이 하나만 기억: **MJCF는 트리에 관절이 내장된 kinematic tree 기술**이고, **USD는 평평한 prim들 사이를 Joint prim이 연결**한다(ArticulationRootAPI가 붙을 때 reduced-coordinate로 해석). 그래서 URDF/MJCF→USD 변환기는 트리를 풀어 joint prim을 생성하는 일을 한다.
 
-## 6. Sim-ready 에셋 체크리스트
+## 6. Isaac Sim과의 연관 — USD가 "포맷"이 아니라 "씬 그 자체"인 곳
+
+Isaac Sim은 NVIDIA Omniverse 위에 올라간 로봇 시뮬레이터인데, Omniverse의 설계가 **"열려 있는 씬 = USD Stage"**다. 즉 USD는 Isaac에서 import/export용 교환 포맷이 아니라 **런타임이 직접 읽고 쓰는 내부 상태**다. 이 구조에서 나오는 결론들:
+
+- **UsdPhysics 스키마가 곧 시뮬 입력이다.** §4에서 본 RigidBodyAPI·CollisionAPI·Joint prim·ArticulationRootAPI를 PhysX 엔진이 그대로 해석해 강체·관절체를 만든다. 스캔 파이프라인이 UsdPhysics를 제대로 채운 USD를 출력하면, 변환 단계 없이 Isaac에 "떨어뜨리면 돌아가는" 에셋이 된다 — sim-ready의 조작적 정의.
+- **URDF/MJCF는 임포터를 거쳐 USD로 변환된다.** §5의 대응표가 실제 임포터가 하는 일이다 — kinematic tree를 풀어 링크를 평평한 prim으로 펴고, 관절을 Joint prim으로, 루트에 ArticulationRootAPI를 붙인다. 변환 후 물성(마찰·드라이브 게인)이 보존됐는지 확인하는 것이 실무 체크포인트.
+- **GPU 대규모 병렬의 단위도 prim 트리다.** Isaac Lab(구 Orbit)은 환경 하나를 prim 서브트리로 정의하고 그것을 수천 개 복제(cloning)해 한 GPU에서 병렬 시뮬레이션한다 — §2의 instanceable 참조 구조가 여기서 성능을 결정한다.
+- **MuJoCo와의 비교 한 줄**: MuJoCo는 CPU 기반 정밀 접촉·가벼운 연구 루프에 강하고, Isaac은 PhysX+GPU 병렬·포토리얼 렌더링(합성 데이터)·USD 생태계가 강점이다. 접촉 모델도 다르다(MuJoCo는 soft contact 볼록 최적화, PhysX는 충격량 기반) — 같은 에셋이라도 두 엔진에서 접촉 거동이 다를 수 있어, 물성 캘리브레이션은 엔진별로 봐야 한다.
+
+![Orbit(Isaac Lab) 설계](figures/isaac/orbit-design.png)
+*Isaac Lab의 전신 Orbit의 계층 구조: USD 씬(에셋·센서·로봇 prim) 위에 PhysX 시뮬레이션, 그 위에 태스크·학습 프레임워크가 쌓인다. "sim-ready USD 에셋"이 전체 스택의 바닥층 입력이라는 그림. 출처: Mittal et al., "Orbit: A Unified Simulation Framework for Interactive Robot Learning Environments", RA-L 2023 (arXiv 2301.04195).*
+
+![Orbit 태스크 환경들](figures/isaac/orbit-tasks.png)
+*USD 에셋으로 구성된 조작·이동 태스크 환경들 — 스캔→sim-ready 파이프라인의 최종 소비처가 이런 로봇 학습 환경이다. 출처: 위와 동일.*
+
+## 7. Sim-ready 에셋 체크리스트
 
 NVIDIA가 SimReady 사양으로 정리한 관례 + 실무 통념:
 
@@ -78,7 +93,7 @@ NVIDIA가 SimReady 사양으로 정리한 관례 + 실무 통념:
 6. **머티리얼**: 시각(MDL/UsdPreviewSurface)과 물리 재질(마찰)을 각각.
 7. **instanceable 참조 구조**: 대량 배치 대비.
 
-## 7. 자주 틀리는 질문 셋 (자문자답)
+## 8. 자주 틀리는 질문 셋 (자문자답)
 
 **Q. USD는 glTF 같은 전송 포맷인가?**
 아니다. glTF는 "최종 결과물 전달"에 최적화된 포맷이고, USD는 **제작 중인 씬을 여러 주체가 합성·편집하는 시스템**이다. 디지털 트윈처럼 "여러 소스(스캔·CAD·시뮬 설정)가 한 씬에 겹치는" 작업에서 USD의 레이어 합성이 본질적 이점이 된다.
