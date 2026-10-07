@@ -68,12 +68,18 @@ OpenUSD(Universal Scene Description)는 Pixar가 영화 제작 파이프라인�
 
 ## 6. Isaac Sim과의 연관 — USD가 "포맷"이 아니라 "씬 그 자체"인 곳
 
-Isaac Sim은 NVIDIA Omniverse 위에 올라간 로봇 시뮬레이터인데, Omniverse의 설계가 **"열려 있는 씬 = USD Stage"**다. 즉 USD는 Isaac에서 import/export용 교환 포맷이 아니라 **런타임이 직접 읽고 쓰는 내부 상태**다. 이 구조에서 나오는 결론들:
+Isaac Sim은 NVIDIA Omniverse 위에 올라간 로봇 시뮬레이터인데, Omniverse의 설계가 **"열려 있는 씬 = USD Stage"**다. 즉 USD는 Isaac에서 import/export용 교환 포맷이 아니라 **런타임이 직접 읽고 쓰는 내부 상태**다.
+
+**Isaac Sim이 무엇인가** — 세 덩어리로 기억한다: ① **물리(PhysX)**: 강체 충돌·관절·마찰 계산 ② **렌더링(RTX 레이트레이싱)**: 카메라 센서를 시뮬레이션해 실사 수준 합성 이미지를 생성 — perception 학습용 합성 데이터와 카메라 입력 정책 훈련이 여기서 나온다 ③ **씬(USD)**: 이 페이지의 주제. 용도는 세 가지 — 합성 데이터 공장, 로봇 학습장(Sim-to-Real), 디지털 트윈 검증.
+
+**Isaac Sim vs Isaac Lab** — 층이 다르다. Sim은 시뮬레이터 본체(엔진)이고, **Isaac Lab(구 Orbit)은 그 위에 얹힌 로봇 학습 프레임워크**다 — 태스크 정의, 관측·보상 설계, 도메인 랜덤라이제이션, 환경 수천 개의 GPU 병렬 복제, RL 라이브러리 연결을 담당한다. Lab은 Sim 없이 못 돌고, Sim은 Lab 없이도 돈다(디지털 트윈·합성 데이터 용도). MuJoCo 생태계로 치면 Sim≈MuJoCo 엔진, Lab≈dm_control/gym 환경 스위트+학습 러너에 해당한다.
+
+이 구조에서 나오는 결론들:
 
 - **UsdPhysics 스키마가 곧 시뮬 입력이다.** §4에서 본 RigidBodyAPI·CollisionAPI·Joint prim·ArticulationRootAPI를 PhysX 엔진이 그대로 해석해 강체·관절체를 만든다. 스캔 파이프라인이 UsdPhysics를 제대로 채운 USD를 출력하면, 변환 단계 없이 Isaac에 "떨어뜨리면 돌아가는" 에셋이 된다 — sim-ready의 조작적 정의.
 - **URDF/MJCF는 임포터를 거쳐 USD로 변환된다.** §5의 대응표가 실제 임포터가 하는 일이다 — kinematic tree를 풀어 링크를 평평한 prim으로 펴고, 관절을 Joint prim으로, 루트에 ArticulationRootAPI를 붙인다. 변환 후 물성(마찰·드라이브 게인)이 보존됐는지 확인하는 것이 실무 체크포인트.
 - **GPU 대규모 병렬의 단위도 prim 트리다.** Isaac Lab(구 Orbit)은 환경 하나를 prim 서브트리로 정의하고 그것을 수천 개 복제(cloning)해 한 GPU에서 병렬 시뮬레이션한다 — §2의 instanceable 참조 구조가 여기서 성능을 결정한다.
-- **MuJoCo와의 비교 한 줄**: MuJoCo는 CPU 기반 정밀 접촉·가벼운 연구 루프에 강하고, Isaac은 PhysX+GPU 병렬·포토리얼 렌더링(합성 데이터)·USD 생태계가 강점이다. 접촉 모델도 다르다(MuJoCo는 soft contact 볼록 최적화, PhysX는 충격량 기반) — 같은 에셋이라도 두 엔진에서 접촉 거동이 다를 수 있어, 물성 캘리브레이션은 엔진별로 봐야 한다.
+- **MuJoCo와의 비교 — "Isaac이 더 실제 같다"는 절반만 맞는다.** 축을 나눠야 한다. **시각(렌더링)**은 명확히 Isaac 우위 — RTX 실사 렌더 vs MuJoCo의 기본 OpenGL. 그러나 **물리(접촉 동역학)**는 우열을 단정할 수 없다: MuJoCo는 soft contact를 볼록 최적화로 푸는 모델로 접촉 정밀 연구에서 평판이 높고, PhysX는 충격량 기반 솔버로 대규모 병렬·속도에 최적화돼 있다 — 접촉이 중요한 조작 연구에서 MuJoCo를 고집하는 그룹이 많은 이유다. 그리고 둘 다 "실제와 같은" 것은 아니어서 Sim-to-Real 갭은 양쪽 모두 존재한다. 결론은 우열이 아니라 선택 기준 — **합성 데이터·대규모 병렬·USD 생태계가 필요하면 Isaac, 접촉 정밀·가벼운 연구 루프면 MuJoCo** — 이고, 같은 에셋이라도 두 엔진에서 접촉 거동이 다를 수 있으니 물성 캘리브레이션은 엔진별로 다시 본다.
 
 ![Orbit(Isaac Lab) 설계](figures/isaac/orbit-design.png)
 *Isaac Lab의 전신 Orbit의 계층 구조: USD 씬(에셋·센서·로봇 prim) 위에 PhysX 시뮬레이션, 그 위에 태스크·학습 프레임워크가 쌓인다. "sim-ready USD 에셋"이 전체 스택의 바닥층 입력이라는 그림. 출처: Mittal et al., "Orbit: A Unified Simulation Framework for Interactive Robot Learning Environments", RA-L 2023 (arXiv 2301.04195).*
