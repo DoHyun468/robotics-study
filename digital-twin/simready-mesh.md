@@ -26,6 +26,26 @@ SuGaR(CVPR 2024)는 가우시안이 **표면에 납작하게 정렬되도록 정
 ![SuGaR 편집·합성](figures/sugar/compositing.png)
 *메시에 가우시안이 바인딩되어 있어 메시 편집·합성이 렌더링에 그대로 반영된다 — "편집 가능한 복원"이라는 sim/저작 관점의 이점. 출처: 위와 동일.*
 
+2DGS와의 관계를 한 줄로: "가우시안을 표면에 납작하게"라는 같은 아이디어를 SuGaR는 **소프트 정규화**로, 2DGS는 **프리미티브 구조 변경**(한 축 제거)으로 달성한다 — 강도의 차이로 읽으면 계보가 이어진다.
+
+### 경로 C: 융합 생략 — Gaussian Opacity Fields (GOF)
+GOF(SIGGRAPH Asia 2024)는 depth 렌더→TSDF 융합이라는 우회로 자체를 생략한다. 레이-가우시안 교차를 이용해 **임의의 3D 점에서 opacity를 직접 평가할 수 있는 필드**를 가우시안 집합 위에 정의하고, 그 레벨셋을 **marching tetrahedra**(복셀 대신 적응형 사면체 그리드를 쓰는 marching cubes의 사면체판)로 바로 추출한다. 복셀 해상도에 묶이지 않아 배경까지 포함한 unbounded 씬의 메시에 특히 강하다. 레이-가우시안 교차에서 depth/normal을 유도하는 수학은 RaDe-GS와 같은 계열이다.
+
+![GOF 티저](figures/gof/teaser.png)
+*GOF: 가우시안 위에 직접 정의한 opacity field의 레벨셋을 tetrahedral grid에서 추출 — depth 융합 없이, 배경 포함 전체 씬 메시. 출처: Yu et al., "Gaussian Opacity Fields: Efficient Adaptive Surface Reconstruction in Unbounded Scenes", SIGGRAPH Asia 2024 (arXiv 2404.10772).*
+
+### 한 장 비교 — "① 어떤 필드를 세우고 ② 등위면을 어떻게 뽑나"
+
+메시 추출은 항상 이 두 선택의 조합이다. marching cubes는 TSDF 전용이 아니라 **임의 스칼라 필드의 등위면 추출기**(1987, 원래 의료 CT용)라서, NeRF density(σ 임계값)·SDF(NeuS 계열의 0-등위면)·occupancy에도 똑같이 걸린다.
+
+| 방법 | ① 필드 | ② 추출 | 한 줄 특징 |
+|---|---|---|---|
+| 3DGS + 후처리 | 기대값 depth → TSDF | marching cubes | 베이스라인 — depth가 물러 품질 한계 |
+| SuGaR | 정렬 정규화된 밀도 레벨셋 | **Poisson** | 소프트 정렬 + 메시-가우시안 바인딩(편집 가능) |
+| 2DGS | 교차 depth → TSDF | marching cubes | 프리미티브를 면으로 — depth가 구조적으로 명확 |
+| GOF | **opacity field 직접 정의** | **marching tetrahedra** | 융합 생략, unbounded 씬에 강함 |
+| RaDe-GS | 닫힌형 depth → TSDF | marching cubes | 3D 표현 유지 + 정밀 depth |
+
 ### 공통 후처리
 - **watertight 보장**: 구멍 메움(hole filling), 비다양체(non-manifold) 정리, 고립 조각 제거. Poisson 계열은 기본적으로 닫힌 표면을 주지만 과팽창(블로비)을 트림하는 과정에서 다시 열릴 수 있다.
 - **단순화(decimation)**: QEM(quadric error metric) 기반 엣지 접기(edge collapse)로 수백만 → 수만 삼각형. 시각 메시는 외관 보존 기준, 충돌용 중간 메시는 부피 보존 기준으로 공격적으로.
@@ -78,4 +98,4 @@ $$V = \frac{1}{6}\left|\sum_{(a,b,c)\in F} a \cdot (b \times c)\right|$$
 > "GS는 렌더 표현이라 그대로는 접촉 계산이 안 됩니다. depth를 정밀화한 변형(2DGS·RaDe-GS)으로 TSDF 융합하거나 SuGaR처럼 가우시안을 표면에 정렬시켜 메시를 뽑고, watertight 정리와 QEM 단순화를 거칩니다. 충돌용으로는 convex 분해가 표준인데, V-HACD는 얕은 오목부를 뭉개는 경향이 있어 충돌 인지형 concavity를 쓰는 CoACD가 기능 보존에 유리합니다. 물리 속성은 watertight 부피 × 재질 추정 밀도로 질량을 잡고 관성은 엔진에 위임하는 게 실용적 자동화 경로고, 평가는 Chamfer 같은 기하 지표에 드롭 테스트·파지 성공률 같은 시뮬 거동 지표를 겹쳐 단계별로 추적합니다."
 
 ---
-*출처: Guédon & Lepetit 2023 (arXiv 2311.12775), Wei et al. 2022 (arXiv 2205.02961), Kerbl et al. 2023 3DGS, Huang et al. 2024 2DGS. 피겨는 원문 HTML판에서 학습 목적 인용.*
+*출처: Guédon & Lepetit 2023 (arXiv 2311.12775), Wei et al. 2022 (arXiv 2205.02961), Kerbl et al. 2023 3DGS, Huang et al. 2024 2DGS, Yu et al. 2024 GOF (arXiv 2404.10772). 피겨는 원문 HTML판에서 학습 목적 인용.*
