@@ -8,3 +8,4 @@
 | 1 | 2026-09-04 | [π0: Flow Matching VLA](2026-09-04-pi0-flow-vla.md) | arXiv 2410.24164 |
 | 2 | 2026-09-07 | [WISE: 월드모델 상상 스케줄링 VLA 사후학습](2026-09-07-wise-world-model-vla.md) | arXiv 2609.03681 |
 | 3 | 2026-09-30 | [TD-MPC2: 스케일링 가능한 implicit 월드모델](2026-09-30-tdmpc2-scalable-world-models.md) | arXiv 2310.16828 |
+| 4 | 2026-10-11 | [LeWAM: JEPA 월드액션모델 + 노이즈 공간 MPC](2026-10-11-lewam-jepa-world-action-model.md) | arXiv 2610.12407 |
