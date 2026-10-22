@@ -6,6 +6,7 @@ parts:
       - file: perception
       - file: manipulation
       - file: robotis
+      - file: planning
   - caption: SLAM · Localization & Mapping
     chapters:
       - file: slam
