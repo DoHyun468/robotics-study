@@ -28,7 +28,7 @@
 | 자유 이동, 4점 이상 | $5+5N$ | 여전히 $5N$ (cross-ratio 불변) | 불가능 |
 | **고정점 회전, 공선점 3개** | $8+2N$ | $2+3N$ | **$N\ge 6$ 가능** |
 
-### 기본 제약식과 폐형해 (§3)
+### 기본 제약식과 폐형해 (§3) — 한 줄씩 유도는 [vision 9장 §2](../vision/calibration.md)
 
 고정점 $A$, 자유끝 $B$($\|B-A\|=L$), 내분점 $C=\lambda_A A+\lambda_B B$. 관측 $\tilde{\mathbf a},\tilde{\mathbf b},\tilde{\mathbf c}$에서 외적으로 $z_B$를 소거하면 프레임당 스칼라 방정식 하나:
 
