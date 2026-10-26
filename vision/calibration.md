@@ -109,7 +109,9 @@ $$ \min_{\boldsymbol\theta}\ \sum_{i=1}^{n}\sum_{j=1}^{m}
 2. **잔차와 야코비안**: 잔차 벡터 $\mathbf r(\boldsymbol\theta) \in \mathbb{R}^{2nm}$, $J = \partial \mathbf r / \partial \boldsymbol\theta$. 투영 $\pi$는 (회전→병진→정규화→왜곡→K) 합성이라 체인룰 블록 곱으로 닫힌 형이 나온다.
 3. **Gauss–Newton**: 2차 테일러에서 residual의 2차 도함수 항을 버리면 $J^\top J\,\boldsymbol\delta = -J^\top \mathbf r$. 수렴 근방에선 빠르지만(준 2차), 초기값이 멀면 $J^\top J$가 악조건일 때 발산.
 4. **LM = 댐핑 넣은 GN**:
+
    $$ (J^\top J + \mu\,\mathrm{diag}(J^\top J))\,\boldsymbol\delta = -J^\top \mathbf r $$
+
    $\mu \to 0$이면 GN, $\mu \to \infty$면 작은 경사하강 스텝 — **"믿을 수 있을 때는 2차, 아닐 때는 1차"를 $\mu$ 하나로 보간**한다. 갱신이 비용을 줄이면 $\mu$를 낮추고(공격적으로), 늘리면 스텝을 버리고 $\mu$를 올린다(보수적으로). 신뢰영역(trust region)의 라그랑주 형태로 읽어도 같다.
 5. **희소성**: $J^\top J$는 화살촉(arrowhead) 구조다 — intrinsic·왜곡 열은 모든 잔차에 걸리지만 $(R_i, \mathbf t_i)$ 열은 **뷰 $i$의 잔차에만** 걸린다. 뷰 블록을 Schur 보수로 먼저 소거하면 뷰 수에 선형으로 풀린다 — [번들 조정](epipolar.md)과 같은 구조이고, 보드 좌표가 월드로 고정돼 있어 게이지 모호가 없다는 점만 다르다.
 6. 보고되는 **재투영 RMS**가 이 목적함수의 최종값이다. 폐형해(1.3~1.6)는 이 비선형 문제의 **초기값 공급자**일 뿐 — 역할 분담을 섞지 않는 것이 Zhang 설계의 요체다.
