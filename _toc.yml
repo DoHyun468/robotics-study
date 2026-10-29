@@ -41,9 +41,6 @@ parts:
           - file: digital-twin/openusd
           - file: digital-twin/articulation
           - file: digital-twin/simready-mesh
-  - caption: Concepts
-    chapters:
-      - file: concepts
   - caption: Camera Geometry & Calibration
     chapters:
       - file: vision/index

@@ -75,7 +75,7 @@ $$
 ## 4. 스터디와의 개념적 연결
 
 - "**예측 가능한 구조만 남긴다**"는 이 사이트 [perception 파이프라인](../perception.md)의 철학과 같다 — point cloud·pose·depth 추정도 결국 관측에서 태스크 무관 픽셀을 버리고 **기하 상태**만 남기는 일이다. V-JEPA는 그 선별을 손으로 설계하지 않고 학습으로 얻는다.
-- **World model 3축** 중 예측·표현형의 원조. 재구성(Dreamer) — 재구성 없이 보상만(MuZero) — 표현만(JEPA)의 스펙트럼에서 가장 오른쪽. 반대편 극단([DIAMOND](diamond.md): 재구성을 더 잘하기)과 대비해 읽으면 구도가 선명하다. 축 정리는 [Concepts](../concepts.md).
+- **World model 3축** 중 예측·표현형의 원조. 재구성(Dreamer) — 재구성 없이 보상만(MuZero) — 표현만(JEPA)의 스펙트럼에서 가장 오른쪽. 반대편 극단([DIAMOND](diamond.md): 재구성을 더 잘하기)과 대비해 읽으면 구도가 선명하다. 축 정리는 [네 갈래 가로 비교](four-families.md).
 - 여기엔 행동도 보상도 없다 — **순수 표현학습**이다. 행동 조건과 로봇 계획은 [V-JEPA 2](vjepa2.md)가 얹는다.
 
 ## 5. 한 줄 평·한계

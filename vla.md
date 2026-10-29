@@ -171,7 +171,7 @@ train 지표는 더 좋아졌는데 **성공률은 20% → 0%로 오히려 떨�
 - **캐비엇 (1)**: 위 결과는 OpenVLA의 **자기 벤치(LIBERO) + 공식 파인튜닝 체크포인트** 결과지, 우리 MuJoCo 커스텀 씬이 아니다 — VLA는 학습된 embodiment/action-space 안에서만 유효하다.
 - **캐비엇 (2)**: 체크포인트를 실행해 논문값을 재현하는 것과 VLA를 처음부터 훈련시키는 것은 다르다. 후자를 직접 시도해본 결과가 위의 "0.45 ep → 0% → 1.2 ep → 4%" 정직한 undertrain 진행 사례다 — 학습은 되지만 수렴엔 훨씬 더 많은 compute가 필요하다.
 - **캐비엇 (3, 4)**: 20-ep는 논문 full-eval(500-ep)의 부분집합이고, 어디까지나 시뮬레이션이며 실사 로봇은 아니다.
-- **다음 축**: 다른 suite(object/goal/long) 간 실패 양상 비교, Octo 같은 경량 모델과의 직접 대조, [grasp_sota.md](grasp_sota.md)의 grasp SOTA A/B와 묶어 "인지형 grasp vs end-to-end VLA 정책" 관점으로 연결. VLA와 world-model 기반 RL 계열의 패러다임 차이는 [concepts.md](concepts.md) 참고.
+- **다음 축**: 다른 suite(object/goal/long) 간 실패 양상 비교, Octo 같은 경량 모델과의 직접 대조, [grasp_sota.md](grasp_sota.md)의 grasp SOTA A/B와 묶어 "인지형 grasp vs end-to-end VLA 정책" 관점으로 연결. VLA와 world-model 기반 RL 계열의 패러다임 차이는 [VLA 리뷰 인덱스](reviews/vla.md) 참고.
 
 ## 재현
 

@@ -51,12 +51,6 @@ OpenVLA LIBERO 4-suite 재현(논문 정합) + 자체 LoRA 파인튜닝의 정�
 멀티뷰 MANO 피팅 recovery-error — 파라메트릭 손 모델을 우리 캘리브 스택 위에서 직접 측정.
 :::
 
-:::{grid-item-card} Concepts
-:link: concepts
-:link-type: doc
-RL vs world-model 정리. 왜 이 스터디가 perception→action에 집중하는가.
-:::
-
 :::{grid-item-card} World Models
 :link: world-models/latent
 :link-type: doc

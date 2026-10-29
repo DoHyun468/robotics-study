@@ -1,6 +1,6 @@
 # Generative World Models
 
-관측(영상)을 **직접 생성**하는 인터랙티브 world model. 스케일·화제성은 최고이나 **장기 물리 일관성·정밀 제어는 아직** — 로봇 제어기보다 sim/데이터 생성 용도가 먼저. 개념적 위치는 [Concepts](../concepts.md).
+관측(영상)을 **직접 생성**하는 인터랙티브 world model. 스케일·화제성은 최고이나 **장기 물리 일관성·정밀 제어는 아직** — 로봇 제어기보다 sim/데이터 생성 용도가 먼저. 개념적 위치는 [네 갈래 가로 비교](four-families.md).
 
 - [GAIA-1 (2023)](gaia1.md) — 자율주행용 9.4B 생성형 world model(Wayve). 스케일링 법칙의 주행 실증.
 - [GameNGen (2024)](gamengen.md) — 신경망만으로 DOOM 실시간 시뮬레이션.

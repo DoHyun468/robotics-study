@@ -89,7 +89,7 @@ $$
 - **3D Gaussian Splatting SLAM**(SplaTAM·GS-SLAM·MonoGS): 장면을 3D 가우시안으로 표현 → **미분가능 rasterization으로 실시간** 트래킹+photorealistic 맵. NeRF의 속도 한계를 넘어 현재 최전선.
 - **파운데이션/기하 사전학습**: DUSt3R·VGGT 등 "이미지 쌍→3D"를 바로 뱉는 모델이 SfM/SLAM 프론트엔드를 재편 중.
 
-→ 이 갈래가 우리 NeRF/3DGS 재구성 배경과 정확히 겹친다. 표현(representation) 관점의 연결은 [Concepts](concepts.md)·[World Models](world-models/predictive.md)(공간/예측 표현)와도 이어진다.
+→ 이 갈래가 우리 NeRF/3DGS 재구성 배경과 정확히 겹친다. 표현(representation) 관점의 연결은 [World Models](world-models/predictive.md)(공간/예측 표현)와도 이어진다.
 
 ## 5. 평가 — 무엇을 숫자로 보나
 

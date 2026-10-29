@@ -15,7 +15,7 @@ python -m http.server 8799 -d _build/html # 미리보기: http://127.0.0.1:8799
 
 ## 구조
 - `_config.yml` / `_toc.yml` — 책 설정·목차
-- `*.md` — 본문 (perception · manipulation · grasp_sota · vla · context · concepts)
+- `*.md` — 본문 (perception · manipulation · grasp_sota · vla · context)
 - `reviews/` — 논문 리뷰 (+ `_template.md`)
 - `_static/` — 데모 영상·이미지
 
