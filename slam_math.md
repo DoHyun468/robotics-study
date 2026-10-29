@@ -81,6 +81,41 @@ $6\times6$ 선형계 한 번 풀어 $x=[\boldsymbol\omega;t]$를 얻고, $\Delta
 
 **코드:** `slam_vo.py`의 `icp_point_to_plane()`, `estimate_normals()`, `vo_icp()`.
 
+### 2.4 ICP 변형 계보 — 무엇을 무엇에 맞추나
+
+모든 ICP는 같은 뼈대(최근접 대응 가정 ↔ 변환 추정의 교대 반복)를 공유하고, 변형은 **거리 메트릭**과 **대응·가중 처리**에서 갈린다.
+
+**(a) Point-to-point (Besl–McKay 1992, 원조).** 메트릭은 점-점 거리:
+
+$$\min_{R,t}\sum_i \|Rp_i+t-q_i\|^2$$
+
+이 경우만 **닫힌해**가 있다(Kabsch/Umeyama): 양쪽 centroid를 빼고 $H=\sum_i \tilde p_i\,\tilde q_i^\top$의 SVD $H=U\Sigma V^\top$에서
+
+$$R=V\,\mathrm{diag}(1,1,\det(VU^\top))\,U^\top,\qquad t=\bar q-R\,\bar p.$$
+
+유도는 [Extrinsic·PnP 장](vision/extrinsic.md)의 절대 자세(Procrustes)와 동일 — $\mathrm{tr}(RH)$ 최대화. 약점: 평면 위에서 접선 방향으로 미끄러질 자유를 안 줘서, 구조화된 장면에서 지그재그 수렴(느림).
+
+**(b) Point-to-plane (Chen–Medioni 1992).** §2.1–2.3이 이것 — 점을 타깃 접평면에 맞춰 평면 내 미끄러짐을 허용하므로 실내·인공 구조물에서 수렴이 빠르다. 닫힌해가 없어 소각 선형화(§2.2)로 6×6 선형계를 반복해 푼다.
+
+**(c) Generalized-ICP (Segal 2009) — "plane-to-plane".** 양쪽 점에 표면 모양을 담은 공분산을 준다: 법선 프레임에서 $\mathrm{diag}(1,1,\varepsilon)$(접평면 방향으로 퍼진 원반)을 회전시킨 $C_i^p, C_i^q$. 정합을 MLE로 쓰면
+
+$$\min_{T}\ \sum_i d_i^\top\big(C_i^q + R\,C_i^p R^\top\big)^{-1} d_i,\qquad d_i = Rp_i+t-q_i.$$
+
+$C=I$면 point-to-point, 타깃만 법선 방향 분산 0이면 point-to-plane — 둘 다 특수 케이스로 포함하는 일반화다. LiDAR 오도메트리의 사실상 표준.
+
+**(d) NDT (Normal Distributions Transform).** 타깃 점군을 복셀별 가우시안 $(\mu_k,\Sigma_k)$으로 요약하고, 소스 점이 떨어지는 복셀의 음의 로그우도를 최소화한다. **최근접 대응 탐색 자체가 사라지고**(복셀 조회만), 비용면이 매끈해 수렴 영역이 넓다 — 엄밀히는 ICP가 아니라 분포 정합.
+
+**(e) 강건화.** 어떤 메트릭이든 대응 오류가 지배 오차라서: 거리 임계·법선 각도·상호 최근접으로 대응 기각, trimmed ICP(잔차 상위 비율 버림), robust 커널(Huber/Tukey, IRLS로 반복 가중). 스케일 미지면 Umeyama 확장($s$ 포함 닫힌해).
+
+**(f) 초기화 — 지역 최소 문제.** ICP는 국소 수렴이라 coarse 정합이 선행된다: FPFH 특징 + RANSAC/FGR, 또는 TEASER++류 글로벌 정합 → ICP는 fine 정제. 우리 S1 파이프라인이 coarse 없이 도는 이유는 프레임 간 모션이 작아 이전 pose가 곧 좋은 초기값이기 때문이다.
+
+| 변형 | 메트릭 | 해법 | 자리 |
+|---|---|---|---|
+| point-to-point | 점-점 | SVD 닫힌해 | 단순·기준선 |
+| point-to-plane | 점-접평면 | 선형화 반복 | 실내·구조물 표준 |
+| GICP | 공분산 가중(MLE) | 비선형 반복 | LiDAR 오도메트리 표준 |
+| NDT | 복셀 가우시안 우도 | 비선형 반복 | 대응 탐색 없음·수렴 영역 넓음 |
+
 ---
 
 ## 3. ORB + PnP — 특징 기반 오도메트리 (S1)
