@@ -8,6 +8,7 @@ parts:
       - file: robotis
       - file: planning
       - file: tracking
+      - file: tracking_filter
   - caption: SLAM · Localization & Mapping
     chapters:
       - file: slam
